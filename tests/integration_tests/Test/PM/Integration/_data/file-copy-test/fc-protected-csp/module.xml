@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="fc-protected-csp.ZPM">
+    <Module>
+      <Name>fc-protected-csp</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <CSPApplication Url="/csp/fc-protected-csp" SourcePath="/web" DeployPath="#{##class(%IPM.Repo.UniversalSettings).GetModuleRoot()}" ServeFiles="1" Recurse="1" PasswordAuthEnabled="0" UnauthenticatedEnabled="1"/>
+    </Module>
+  </Document>
+</Export>

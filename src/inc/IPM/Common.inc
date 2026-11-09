@@ -70,6 +70,14 @@ ROUTINE %IPM.Common [Type=INC]
 #; Variable to mark deprecation warning has been shown in the current process
 #define DeprecationWarned %IPMModuleDeprecatedResource
 
+#; Repo lookup state for the current shell command, defined only while %IPM.Main.ShellInternal runs one
+#define RepoLookupState %IPMRepoLookupState
+
+#; Results of %IPM.Repo.Oras.PackageService:ProbeCredentials
+#define OrasCredentialsAccepted "accepted"
+#define OrasCredentialsRejected "rejected"
+#define OrasCredentialsUnknown "unknown"
+
 #; Convert module version from/to OCI tag
 #def1arg Semver2Tag(%semver) $Replace(%semver,"+","_")
 #def1arg Tag2Semver(%tag) $Replace(%tag,"_","+")

@@ -136,11 +136,80 @@ Method TestZeroByteFilePreservedAfterExtract()
     do $$$AssertStatusOK(sc,"Uninstalled zero-byte-file after reinstall.")
     set sc = ##class(%IPM.Main).Shell("repo -delete-all")
     do $$$AssertStatusOK(sc,"Deleted repos successfully.")
-    set sc = ##class(%IPM.Main).Shell("repo -reset-defaults")
-    do $$$AssertStatusOK(sc,"Reset repos to default successfully.")
   } catch e {
     do $$$AssertStatusOK(e.AsStatus(),"An exception occurred.")
   }
+}
+
+/// macOS and Windows tar (bsdtar) and GNU tar with <code>--format=pax</code> write a pax extended header before entries.
+/// The header can carry the entry's full path when it exceeds the 100-character ustar name field.
+Method TestLoadPaxTarball()
+{
+    set workDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).ManagerDirectory()_"pax-src-"_$job)
+    set archive = ##class(%Library.File).ManagerDirectory()_"pax-"_$job_".tgz"
+    try {
+        set testRoot = ##class(%Library.File).NormalizeDirectory($get(^UnitTestRoot))
+        set moduleDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).GetDirectory(testRoot)_"/_data/simple-module/")
+        $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(moduleDir, workDir))
+
+        set longName = $translate($justify("", 60), " ", "a")_"/"_$translate($justify("", 60), " ", "b")_".txt"
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(##class(%Library.File).GetDirectory(workDir_longName)))
+        set stream = ##class(%Stream.FileCharacter).%New()
+        $$$ThrowOnError(stream.LinkToFile(workDir_longName))
+        do stream.Write("long")
+        $$$ThrowOnError(stream.%Save())
+
+        do $$$AssertEquals($zf(-100, "", "tar", "--format=pax", "-czf", archive, "-C", workDir, "."), 0, "Created pax tarball.")
+
+        set sc = ##class(%IPM.Main).Shell("load "_archive)
+        do $$$AssertStatusOK(sc, "Loaded SimpleModule from pax tarball.")
+        set module = ##class(%IPM.Storage.Module).NameOpen("simplemodule", , .sc)
+        $$$ThrowOnError(sc)
+        do $$$AssertTrue(##class(%Library.File).Exists(module.Root_longName), "Pax path record gives the full long file name.")
+        do $$$AssertNotTrue(##class(%Library.File).Exists(module.Root_"PaxHeaders"), "Pax headers are not extracted as files.")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(), "An exception occurred.")
+    }
+    do ##class(%IPM.Main).Shell("uninstall simplemodule")
+    do ##class(%IPM.Utils.File).RemoveDirectoryTree(workDir)
+    do ##class(%Library.File).Delete(archive)
+}
+
+Method TestLoadTarballFailureRemovesTempDirectory()
+{
+    set workDir = ##class(%Library.File).NormalizeDirectory(##class(%Library.File).ManagerDirectory()_"no-module-src-"_$job)
+    set archive = ##class(%Library.File).ManagerDirectory()_"no-module-"_$job_".tgz"
+    try {
+        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(workDir))
+        set stream = ##class(%Stream.FileCharacter).%New()
+        $$$ThrowOnError(stream.LinkToFile(workDir_"readme.txt"))
+        do stream.Write("not a module")
+        $$$ThrowOnError(stream.%Save())
+        do $$$AssertEquals($zf(-100, "", "tar", "-czf", archive, "-C", workDir, "."), 0, "Created tarball without module.xml.")
+
+        set before = ..ListTempDirectories()
+        set sc = ##class(%IPM.Main).Shell("load "_archive)
+        do $$$AssertStatusNotOK(sc, "Load fails without module.xml.")
+        do $$$AssertEquals(..ListTempDirectories(), before, "Failed load leaves no extraction directory behind.")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(), "An exception occurred.")
+    }
+    do ##class(%IPM.Utils.File).RemoveDirectoryTree(workDir)
+    do ##class(%Library.File).Delete(archive)
+}
+
+/// Returns the subdirectories of the IRIS temp directory as a sorted, comma-delimited string.
+ClassMethod ListTempDirectories() As %String
+{
+    set rs = ##class(%SQL.Statement).%ExecDirect(, "SELECT Name FROM %Library.File_FileSet(?, ?, ?, ?) WHERE Type = 'D'", ##class(%SYS.System).TempDirectory(), "*", "Name", 1)
+    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+    set list = ""
+    while rs.%Next(.sc) {
+        $$$ThrowOnError(sc)
+        set list = list_","_rs.%Get("Name")
+    }
+    $$$ThrowOnError(sc)
+    return list
 }
 
 }

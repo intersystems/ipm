@@ -6,6 +6,9 @@ Parameter REPONAME = "build-dependency-graph";
 
 Method OnBeforeAllTests() As %Status
 {
+    // Repos left by other classes (e.g. the default community registry) would be searched for every dependency
+    set sc = ##class(%IPM.Main).Shell("repo -delete-all")
+    do $$$AssertStatusOK(sc, "Deleted existing repos.")
     // Set up repo once
     set sc = ##class(%IPM.Main).Shell("repo -n "_..#REPONAME_" -fs -path "_..GetModuleDir(..#REPONAME))
     do $$$AssertStatusOK(sc, "Created "_..#REPONAME_" repo successfully.")

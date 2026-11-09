@@ -57,7 +57,9 @@ Index Children On Children(KEYS);
 /// Tells us if this resource belongs to a module currently being processed as part of the update command
 /// If set to false, incoming resources with the same name will throw an error
 /// If set to true, incoming resources with the same name will overwrite this entry
-Property MarkedForUpdate As %Boolean [ InitialExpression = 0 ];
+/// Never exported, since IPM before 0.10.7 rejects the tag. Still accepted on import because manifests
+/// published by IPM 0.10.7-0.10.10 contain it; switch to XMLPROJECTION = "NONE" by 1.0.
+Property MarkedForUpdate As %Boolean(XMLIO = "IN") [ InitialExpression = 0 ];
 
 Method ProcessorGet() As %IPM.ResourceProcessor.Abstract
 {
@@ -65,19 +67,27 @@ Method ProcessorGet() As %IPM.ResourceProcessor.Abstract
     if $isobject(r%Processor) {
         quit r%Processor
     }
-    set tProcessorClass = ..ProcessorClass
-    if (tProcessorClass '= "") && '$$$comClassDefined(tProcessorClass) && $$$comClassDefined($$$DefaultProcessorPackageDot_tProcessorClass) {
-        set tProcessorClass = $$$DefaultProcessorPackageDot_tProcessorClass
-    }
-    if (tProcessorClass = "") {
-        // Default class for resource extension
-        set tProcessorClass = ..Module.Lifecycle.GetDefaultResourceProcessor(..Name)
-    }
+    set tProcessorClass = ..ResolvedProcessorClass()
     if (tProcessorClass = "") || '$$$comClassDefined(tProcessorClass) {
         quit $$$NULLOREF
     }
     set r%Processor = $classmethod(tProcessorClass,"%New",$this)
     quit r%Processor
+}
+
+/// Returns the processor class the lifecycle uses for this resource, whether or not that class is defined.
+/// Returns "" when no processor applies, e.g. for a resource starting with / and no ProcessorClass.
+Method ResolvedProcessorClass() As %Dictionary.Classname
+{
+    set processorClass = ..ProcessorClass
+    if (processorClass '= "") && '$$$comClassDefined(processorClass) && $$$comClassDefined($$$DefaultProcessorPackageDot_processorClass) {
+        set processorClass = $$$DefaultProcessorPackageDot_processorClass
+    }
+    if (processorClass = "") {
+        // Default class for resource extension
+        set processorClass = ..Module.Lifecycle.GetDefaultResourceProcessor(..Name)
+    }
+    return processorClass
 }
 
 Method ProcessorClassGet() As %String

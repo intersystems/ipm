@@ -90,7 +90,8 @@ ClassMethod LoadModuleReference(
             quit
         }
         set tModRef = ##class(%IPM.Storage.ModuleInfo).%New()
-        set tModRef.Name = pModuleName
+        // Pulled by the name the repository has it under, which can differ from a dependency's name
+        set tModRef.Name = $listget($get(pDependencyGraph(pModuleName)), 8, pModuleName)
         set tModRef.VersionString = pVersion
         set tModRef.Deployed = pDeployed
         set tModRef.PlatformVersion = pPlatformVersion
@@ -204,12 +205,7 @@ ClassMethod LoadModuleReference(
         }
     }
     if $isobject($get(log)) && (prelogged=0) {
-		if $data(tDeveloperMode) # 2 {
-			set devMode = $get(tDeveloperMode, 0)
-		} else {
-			set devMode = $get(pParams("DeveloperMode"), 0)
-		}
-		set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
+		set tSC = $$$ADDSC(tSC, log.Finalize(tSC))
 	}
     quit tSC
 }
@@ -270,6 +266,30 @@ ClassMethod LoadModuleFromArchive(
     quit tSC
 }
 
+/// Returns the status of a <code>$system.OBJ.ImportDir</code> call without errors for files IRIS
+/// cannot import (such as .DS_Store), so they do not fail the load. ImportDir still loads every other
+/// file, but its returned status holds only the first error, so a real error is rebuilt from the log.
+ClassMethod RemoveUnsupportedFileErrors(
+	importSC As %Status,
+	ByRef errorLog) As %Status
+{
+    if $$$ISOK(importSC) || '$get(errorLog) {
+        return importSC
+    }
+    set sc = $$$OK
+    for i=1:1:errorLog {
+        if errorLog(i, "code") = $$$ImportUnknownType {
+            continue
+        }
+        set entrySC = $system.Status.Error(errorLog(i, "code"), $get(errorLog(i, "param", 1)), $get(errorLog(i, "param", 2)), $get(errorLog(i, "param", 3)))
+        if $data(errorLog(i, "embeddedstatus"), embeddedSC) {
+            set entrySC = $$$EMBEDSC(entrySC, embeddedSC)
+        }
+        set sc = $$$ADDSC(sc, entrySC)
+    }
+    return sc
+}
+
 ClassMethod LoadModuleFromDirectory(
 	pDirectory As %String,
 	ByRef pParams,
@@ -321,7 +341,8 @@ ClassMethod GetModuleObjectFromPath(
     if '##class(%Library.File).Exists(modulePath) {
         $$$ThrowStatus($$$ERROR($$$GeneralError,"File not found to obtain module object: "_modulePath))
     }
-    set stream = ##class(%Stream.FileCharacter).%New()
+    // Binary so the XML parser decodes per the encoding declaration, not the process's default file translation table
+    set stream = ##class(%Stream.FileBinary).%New()
     $$$ThrowOnError(stream.LinkToFile(modulePath))
     return ..GetModuleObjectFromStream(stream,.pFound)
 }
@@ -898,26 +919,26 @@ ClassMethod GetModuleListExecute(
         }
 
         set tClient = tServer.GetPackageService()
-        if tClient.IsAvailable() {
-            set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
-            set tSearchCriteria.IncludePrerelease = tServer.Prereleases
-            set tSearchCriteria.IncludeSnapshots = tServer.Snapshots
-            set tSearchCriteria.AllVersions = pShowAllVersions
-            set tList = ""
-            try {
+        set tList = ""
+        try {
+            if tClient.IsAvailable() {
+                set tSearchCriteria = ##class(%IPM.Repo.SearchCriteria).%New()
+                set tSearchCriteria.IncludePrerelease = tServer.Prereleases
+                set tSearchCriteria.IncludeSnapshots = tServer.Snapshots
+                set tSearchCriteria.AllVersions = pShowAllVersions
                 set tList = tClient.ListModules(tSearchCriteria)
-            } catch e {
-                write !, "Skipping repo '" _ pServer _ "': " _ $system.Status.GetErrorText(e.AsStatus())
             }
-            if $isobject(tList) {
-                set platformVersion = $$$CurrentPlatformVersion
-                for i=1:1:tList.Count() {
-                    set tMod = tList.GetAt(i)
-                    if 'pShowAllVersions && 'tMod.IsCompatibleWithPlatform(platformVersion) {
-                        continue
-                    }
-                    set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions, tMod.FormatPlatformVersions())
+        } catch e {
+            write !, "Skipping repo '" _ pServer _ "': " _ $system.Status.GetErrorText(e.AsStatus())
+        }
+        if $isobject(tList) {
+            set platformVersion = $$$CurrentPlatformVersion
+            for i=1:1:tList.Count() {
+                set tMod = tList.GetAt(i)
+                if 'pShowAllVersions && 'tMod.IsCompatibleWithPlatform(platformVersion) {
+                    continue
                 }
+                set qHandle($increment(qHandle)) = $listbuild(tMod.Name,tMod.Version.ToString(),tMod.Repository,tMod.Description, tMod.Origin, tMod.AllVersions, tMod.FormatPlatformVersions())
             }
         }
 
@@ -1140,7 +1161,10 @@ ClassMethod LoadNewModule(
     set tSC = $$$OK
     set tInitTLevel = $tlevel
     try {
-        do ..GetModuleDefaultsFromXML(pDirectory, .defaults)
+        set newModuleObj = ..GetModuleObjectFromPath(pDirectory,.foundNewModuleObj)
+        if foundNewModuleObj {
+            do newModuleObj.GetDefaultParameters(.defaults)
+        }
         merge params = defaults
         merge params = pParams
 
@@ -1171,7 +1195,6 @@ ClassMethod LoadNewModule(
             tstart
         }
 
-        set newModuleObj = ..GetModuleObjectFromPath(pDirectory,.foundNewModuleObj)
         set toVersion = ""
         set toVersionString = ""
         set fromVersion = ""
@@ -1202,6 +1225,11 @@ ClassMethod LoadNewModule(
                 set msg = $$$FormatText("Cannot perform an update of %1 from version %2 to %3 using the 'install' or 'load' commands. Please use the 'update' command instead. If you are intentionally trying to bypass running update steps, please use the -force flag for 'install' or 'load'.", newModuleObj.Name, fromVersionString, toVersionString)
                 $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
             }
+        }
+
+        // Without a transaction, everything written from here on is kept even if the load fails.
+        if 'tUseTransactions && $isobject(pLog) {
+            do pLog.SetCommitted()
         }
 
         // Mark relevant resources for update
@@ -1286,6 +1314,9 @@ ClassMethod LoadNewModule(
         if (tDeveloperMode && tUseTransactions) {
             // In developer mode, save the module manifest so we can fix it even if errors occur afterward.
             tcommit
+            if $isobject(pLog) {
+                do pLog.SetCommitted()
+            }
 
             // Nested transactions in underlying calls to LoadNewModule during the dependency resolution process may be rolled back at the end of this method.
             // To debug a dependency, that module itself should be loaded in "developer mode"
@@ -1327,6 +1358,9 @@ ClassMethod LoadNewModule(
         set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params, pLog)
         if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions && ($tlevel > tInitTLevel) {
             tcommit
+            if $isobject(pLog) {
+                do pLog.SetCommitted()
+            }
         }
         $$$ThrowOnError(tSC)
         do tModule.WriteAfterInstallMessage()
@@ -2853,6 +2887,17 @@ ClassMethod GetDeployedProjectPath(root As %String) As %String
 {
     set deployedDirectory = ##class(%File).NormalizeDirectory($$$DeployedXMLDir, root)
     quit deployedDirectory_$$$DeployedXMLName
+}
+
+/// Returns whether documents of this type install from the deployed project. Other types are packaged
+/// and installed as source, even when their resource sets Deploy="true".
+/// <example>
+/// write ##class(%IPM.Utils.Module).IsDeployableType("cls") // 1
+/// write ##class(%IPM.Utils.Module).IsDeployableType("INC") // 0
+/// </example>
+ClassMethod IsDeployableType(type As %String) As %Boolean [ CodeMode = expression ]
+{
+''$listfind($listbuild("CLS", "MAC", "INT"), $zconvert(type, "U"))
 }
 
 ClassMethod GetDeployedProjectName(moduleName As %String) As %String [ CodeMode = expression ]

@@ -7,6 +7,19 @@ Parameter ModuleName As STRING = "demo-module1";
 
 Parameter ClsDefName As STRING = "Test.TrackPlaceHolders";
 
+/// Removes the generated module even if the test stopped before deleting it
+Method OnAfterAllTests() As %Status
+{
+    do ##class(%File).RemoveDirectoryTree(..ModuleDir())
+    return $$$OK
+}
+
+/// The module.xml is generated outside the repo so a failed run cannot leave it there
+ClassMethod ModuleDir() As %String
+{
+    return ##class(%File).NormalizeDirectory(..#CommonPathPrefix, $system.Util.ManagerDirectory())
+}
+
 /// This test validates that the IPM engine can handle "chained" ${variables}
 /// (placeholders that resolve to other placeholders).
 /// 1. Generates a 'module.xml' from XData with deep variable dependencies.
@@ -104,12 +117,8 @@ Method CreateClassdef() As %Status
 
 Method CreateModuleXml(Output pModuleDir) As %Status
 {
-    #define NormalizeDirectory(%path)   ##class(%File).NormalizeDirectory(%path)
-    #define UTRoot                      ^UnitTestRoot
-
     set sc = $$$OK
-    set testRoot = $$$NormalizeDirectory($get($$$UTRoot))
-    set pModuleDir = $$$NormalizeDirectory(##class(%File).GetDirectory(testRoot)_"/_data/"_..#CommonPathPrefix_"/")
+    set pModuleDir = ..ModuleDir()
 
     if '##class(%File).DirectoryExists(pModuleDir) {
         set sc = ##class(%File).CreateDirectoryChain(pModuleDir)

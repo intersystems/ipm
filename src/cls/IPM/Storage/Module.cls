@@ -27,7 +27,7 @@ Property Keywords As %String(MAXLEN = "");
 Property Author As %IPM.Storage.ModuleAuthorInfo;
 
 /// Typically "module" or "application", but intentionally not enforced with VALUELIST.
-Property Packaging As %String [ Required ];
+Property Packaging As %String(MAXLEN = 255) [ Required ];
 
 Property Dependencies As list Of %IPM.Storage.ModuleReference(STORAGEDEFAULT = "array");
 
@@ -63,7 +63,7 @@ Property InstallerClass As %Dictionary.Classname;
 
 Property Lifecycle As %IPM.Lifecycle.Base(XMLPROJECTION = "NONE") [ Transient ];
 
-Property Hash As %Binary(ForceCodeGenerate = 0, XMLPROJECTION = "NONE");
+Property Hash As %Binary(ForceCodeGenerate = 0, MAXLEN = 20, XMLPROJECTION = "NONE");
 
 Property LastModifiedTimestamp As %TimeStamp(ForceCodeGenerate = 0, XMLPROJECTION = "NONE") [ InitialExpression = {$zdatetime($horolog,3)} ];
 
@@ -633,7 +633,7 @@ ClassMethod ExecutePhases(
                     if isSelfUninstall && $isobject(pLog) {
                         // Log the Clean phase completion and finalize now
                         do pLog.FinalizePhase(tOnePhase, $$$OK)
-                        set tSC = pLog.Finalize($$$OK, 0)
+                        set tSC = pLog.Finalize($$$OK)
                         $$$ThrowOnError(tSC)
                         // Explicitly persist to twin while History classes still exist
                         $$$ThrowOnError(pLog.PersistToTwin())
@@ -747,11 +747,10 @@ ClassMethod Uninstall(
     } catch e {
         set tSC = e.AsStatus()
     }
-	set devMode = $get(pParams("DeveloperMode", 0))
 	// Only finalize if log wasn't already finalized and deleted (e.g., during self-uninstall)
 	if $isobject(log) {
 		try {
-			set tSC = $$$ADDSC(tSC, log.Finalize(tSC, devMode))
+			set tSC = $$$ADDSC(tSC, log.Finalize(tSC))
 		} catch {
 			// Skip if log was already deleted during self-uninstall
 		}
@@ -884,6 +883,8 @@ ClassMethod HasScope(
 /// <li>Scope of the module, or empty string if the dependency is not scoped</li>
 /// <li>Whether the module is deployed</li>
 /// <li>Platform version the deployed module was built for, or empty string if not deployed</li>
+/// <li>Name of the module in the repository, which can differ from the dependency's name, e.g. an ORAS
+/// repository matches a module's ExternalName too. Empty if already installed.</li>
 /// </ul>
 /// <p>
 /// <b>Parameters:</b><br>
@@ -1210,7 +1211,7 @@ Method ProcessSingleDependencyIterative(
 
             set pDependencyGraph(pDep.Name) = $listbuild(
                 pDepth, qualifiedReference.ServerName, moduleObj.VersionString, pDep.DisplayName, pDep.Scope,
-                qualifiedReference.Deployed, qualifiedReference.PlatformVersion
+                qualifiedReference.Deployed, qualifiedReference.PlatformVersion, qualifiedReference.Name
             )
             set pDependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 
@@ -1244,7 +1245,7 @@ Method ProcessSingleDependencyIterative(
                 set depth = $select(previousDepth=0:pDepth,previousDepth>pDepth:previousDepth,1:pDepth)
                 set dependencyGraph(pDep.Name) = $listbuild(
                     depth,qualifiedReference.ServerName,moduleObj.VersionString,pDep.DisplayName,pDep.Scope,
-                    qualifiedReference.Deployed,qualifiedReference.PlatformVersion
+                    qualifiedReference.Deployed,qualifiedReference.PlatformVersion,qualifiedReference.Name
                 )
                 set dependencyGraph(pDep.Name,pParentInfo) = pDep.VersionString
 

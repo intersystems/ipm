@@ -7,6 +7,12 @@ Parameter MONIKER As STRING = "oras";
 
 Property Namespace As %IPM.DataType.OrasNamespace;
 
+/// Covers the namespace as well as the URL, so repos on one registry can use different namespaces.
+Method RepoKey() As %List
+{
+    return ..ComputeRepoKey(..URL, ..Namespace)
+}
+
 Method NamespaceGet() As %IPM.DataType.OrasNamespace
 {
     return ##class(%IPM.DataType.OrasNamespace).Normalize(i%Namespace)
@@ -30,26 +36,8 @@ Note, this is not the IRIS namespace, but a namespace in the sense of a (sub)dir
 Method GetPackageService() As %IPM.Repo.IPackageService
 {
     set tClient = ##class(%IPM.Repo.Oras.PackageService).%New()
-    // We want to preprend the prefix to the "GET"/"POST"/etc. requests
-    // Otherwise, it will be overwritten
-    set tUrl = ..URL
-    // %Net.URLParser.Decompose misparses bare hostnames as path components; scheme must be present.
-    if ($piece(tUrl, "://")'["http") {
-        set tUrl = "https://" _ tUrl
-    }
-    do ##class(%Net.URLParser).Decompose(tUrl,.comp)
-    if $data(comp("path"), path) && (path '= "") && (path '= "/") {
-        // Decompose includes a leading slash; strip it for use as a prefix
-        if $extract(path, 1) = "/" {
-            set path = $extract(path, 2, *)
-        }
-        if $extract(path, *) '= "/" {
-            set path = path _ "/"
-        }
-        set tClient.PathPrefix = path
-    }
-    kill comp("path")
-    set tClient.Location = ##class(%Net.URLParser).Compose(.comp)
+    set tClient.Location = ##class(%IPM.DataType.RepoLocation).Canonicalize(..URL)
+    set tClient.RepoName = ..Name
     set tClient.Namespace = ..Namespace
     set tClient.Username = ..Username
     set tClient.Password = ..Password
@@ -62,7 +50,8 @@ Method GetPackageService() As %IPM.Repo.IPackageService
 Method GetPublishService() As %IPM.Repo.IPublishService
 {
     set tClient = ##class(%IPM.Repo.Oras.PublishService).%New()
-    set tClient.Location = ..URL
+    set tClient.Location = ##class(%IPM.DataType.RepoLocation).Canonicalize(..URL)
+    set tClient.RepoName = ..Name
     set tClient.Namespace = ..Namespace
     set tClient.Username = ..Username
     set tClient.Password = ..Password
@@ -81,7 +70,15 @@ Method Display()
     }
     if (..Username '= "") || (..Password '= "") || (..Token '= "") {
         set packageService = ..GetPackageService()
-        set authenticated = (packageService.IsAvailable() && packageService.IsAuthenticated())
+        try {
+            set authenticated = (packageService.IsAvailable() && packageService.IsAuthenticated())
+        } catch e {
+            if e.%IsA("%Exception.SystemException") {
+                throw e
+            }
+            // The base class shows the error under Available?
+            set authenticated = 0
+        }
         write !,$char(9),"Authenticated?",..Padding(1),$$$YesNo(authenticated)
     }
 }
@@ -96,15 +93,18 @@ ClassMethod OnConfigure(
     set tSC = $$$OK
     try {
         set tUrl = $get(pModifiers("url"), pInstance.URL)
-        if (..URLExists(tUrl, .tId)) && (tId '= pInstance.%Id())  {
-            $$$ThrowStatus($$$ERROR($$$GeneralError, "Unable to add new ORAS server with non-unique URL."))
-        }
         if (pInteractive && (tUrl = "")) {
             set tPrompt = ..#URLPromptString
             set tResponse = ##class(%Library.Prompt).GetString(tPrompt, .tUrl)
             if (tResponse '= $$$SuccessResponse) {
                 $$$ThrowStatus($$$ERROR($$$GeneralError, "Operation cancelled."))
             }
+        }
+        set namespace = ##class(%IPM.DataType.OrasNamespace).Normalize($get(pModifiers("namespace"), pInstance.Namespace))
+        // A repo saved with a path or a duplicate URL stays configurable, e.g. with -disable, until its URL or namespace changes
+        if $data(pModifiers("url")) || $data(pModifiers("namespace")) || (pInstance.%Id() = "") {
+            do ##class(%IPM.Repo.Oras.PackageService).CheckNoPath(tUrl, namespace)
+            do ..CheckRepoKeyUnique(pInstance, ..ComputeRepoKey(tUrl, namespace), "URL and namespace")
         }
         if $data(pModifiers("username"), tUsername) {
             set pInstance.Username = tUsername
@@ -126,7 +126,7 @@ ClassMethod OnConfigure(
         }
         if (pInstance.DeploymentEnabled = 1) {
             set tServer = ##class(%IPM.Repo.Oras.Definition).DeploymentServerOpen(1)
-            if $isobject(tServer),tServer.URL'=pInstance.URL {
+            if $isobject(tServer),tServer.%Id()'=pInstance.%Id() {
                 set tServer.DeploymentEnabled = 0
                 $$$ThrowOnError(tServer.%Save())
             }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+<Document name="unsupported-files.ZPM"><Module>
+  <Name>unsupported-files</Name>
+  <Version>0.0.1</Version>
+  <Resources>
+    <Resource Name="Test.UnsupportedPreload.Processor.CLS" Preload="true"/>
+    <Resource Name="Test.Unsupported.PKG"/>
+    <Resource Name="/data/" ProcessorClass="Test.UnsupportedPreload.Processor"/>
+  </Resources>
+</Module>
+</Document></Export>

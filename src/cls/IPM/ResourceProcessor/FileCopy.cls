@@ -1,3 +1,5 @@
+Include %IPM.Formatting
+
 Class %IPM.ResourceProcessor.FileCopy Extends %IPM.ResourceProcessor.Abstract
 {
 
@@ -5,7 +7,7 @@ Class %IPM.ResourceProcessor.FileCopy Extends %IPM.ResourceProcessor.Abstract
 Parameter DESCRIPTION As STRING = "Copies the specified directory or file  (the resource name) to a specific target location (InstallDirectory) during the Activate phase.";
 
 /// Comma-separated list of resource attribute names that this processor uses
-Parameter ATTRIBUTES As STRING = "Name,InstallDirectory,Overlay,CSPApplication,Defer";
+Parameter ATTRIBUTES As STRING = "Name,InstallDirectory,Overlay,CSPApplication,Defer,KeepOnUninstall";
 
 Property Name As %String(MAXLEN = "") [ Aliases = {SourceDirectory} ];
 
@@ -27,6 +29,12 @@ Property CSPApplication As %String(MAXLEN = "");
 /// Use this for build artifacts.
 Property Defer As %Boolean [ InitialExpression = 0 ];
 
+/// If true, the copied file or directory is left in place when the module is uninstalled or cleaned.
+/// Use this for files that other modules may also expect at the target, since IPM does not track
+/// which module a shared file belongs to. Files this module alone uses can go in a separate resource
+/// without this flag, so they are still removed.
+Property KeepOnUninstall As %Boolean [ InitialExpression = 0 ];
+
 Method OnBeforePhase(
 	pPhase As %String,
 	ByRef pParams) As %Status
@@ -43,6 +51,7 @@ Method OnBeforePhase(
         if (pPhase = "Activate") && (..InstallDirectory '= "") && ('..Defer) {
             set tSource = ..GetSource()
             set tTarget = ..InstallDirectory
+            do ##class(%IPM.Utils.File).WarnIfInInstallDirectory(tTarget, ..ResourceReference)
             set tSC = ..DoCopy(tSource, tTarget, .pParams)
             if $$$ISERR(tSC) {
                 quit
@@ -69,6 +78,7 @@ Method OnAfterPhase(
         if (pPhase = "Activate") && (..InstallDirectory '= "") && (..Defer) {
             set tSource = ..GetSource()
             set tTarget = ..InstallDirectory
+            do ##class(%IPM.Utils.File).WarnIfInInstallDirectory(tTarget, ..ResourceReference)
             set tSC = ..DoCopy(tSource, tTarget, .pParams)
             if $$$ISERR(tSC) {
                 quit
@@ -200,7 +210,12 @@ Method DoCopy(
             }
         } else {
             write:tVerbose " as directory "
-            set tSC = ##class(%IPM.Utils.File).CopyDir(tSource,tTarget,'..Overlay)
+            set deleteFirst = '..Overlay
+            if deleteFirst && ##class(%IPM.Utils.File).IsProtectedDirectory(tTarget) {
+                write !, $$$FormattedLine($$$Yellow, "WARNING: "_tTarget_" is a protected IRIS or IPM directory. Copying into it without clearing it first.")
+                set deleteFirst = 0
+            }
+            set tSC = ##class(%IPM.Utils.File).CopyDir(tSource,tTarget,deleteFirst)
         }
     } catch e {
         set tSC = e.AsStatus()
@@ -233,6 +248,14 @@ Method OnPhase(
         set tSource = ..ResourceReference.Module.Root _ ..Name
         set tTarget = ..InstallDirectory
         do ..NormalizeNames(.tSource, .tTarget, .tTargetDir, .copyAsFile)
+        if ..KeepOnUninstall {
+            write:tVerbose !,"Keeping ",tTarget
+            return $$$OK
+        }
+        if 'copyAsFile && ##class(%IPM.Utils.File).IsProtectedDirectory(tTarget) {
+            write !, $$$FormattedLine($$$Yellow, "WARNING: "_tTarget_" is a protected IRIS or IPM directory. Leaving it in place.")
+            return $$$OK
+        }
         write:tVerbose !,"Deleting ",tTarget
         if copyAsFile {
             do ##class(%File).Delete(tTarget)

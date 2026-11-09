@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="oras-throwing-repo.ZPM">
+    <Module>
+      <Name>oras-throwing-repo</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <Resource Name="OrasThrowingRepo.PKG"/>
+    </Module>
+  </Document>
+</Export>

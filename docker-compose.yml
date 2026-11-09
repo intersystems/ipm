@@ -48,3 +48,6 @@ services:
     restart: always
     ports:
       - 5001:5000
+    volumes:
+      - ./tests/oras/zot-config.json:/etc/zot/config.json:ro
+      - ./tests/oras/htpasswd:/etc/zot/htpasswd:ro

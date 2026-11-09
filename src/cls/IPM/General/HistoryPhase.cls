@@ -5,7 +5,7 @@ Class %IPM.General.HistoryPhase Extends %SerialObject
 
 /// Name of the phase
 /// Standard phases are in %IPM.DataType.PhaseName but this also supports Custom Phases
-Property Name As %String [ Required ];
+Property Name As %String(MAXLEN = 255) [ Required ];
 
 /// Time when the phase started
 Property TimeStart As %TimeStamp [ InitialExpression = {$zdatetime($now(), 3)}, Required ];

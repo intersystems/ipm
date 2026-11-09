@@ -4,8 +4,15 @@ Class Test.PM.Integration.FileCopy Extends Test.PM.Integration.Base
 Method OnBeforeAllTests() As %Status
 {
     // Setup repo for FileCopy tests
-    set status = ##class(%IPM.Main).Shell("repo -n integration-tests -fs -path /home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/")
+    set status = ##class(%IPM.Main).Shell("repo -n integration-tests -fs -path " _ ..GetModuleDir("file-copy-test"))
     do $$$AssertStatusOK(status,"Created integration-tests repo successfully.")
+    return status
+}
+
+Method OnAfterAllTests() As %Status
+{
+    set status = ##class(%IPM.Main).Shell("repo -delete -name integration-tests")
+    do $$$AssertStatusOK(status,"Deleted integration-tests repo successfully.")
     return status
 }
 
@@ -80,6 +87,71 @@ Method TestDependencySameResourceName()
     } catch e {
         do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in TestDependencySameResourceName.")
     }
+}
+
+Method TestKeepOnUninstall()
+{
+    set targetDir = ##class(%File).NormalizeDirectory("../fc-keep-on-uninstall/", $system.Util.ManagerDirectory())
+    try {
+        set status = ##class(%IPM.Main).Shell("install fc-keep-on-uninstall")
+        do $$$AssertStatusOK(status,"Installed fc-keep-on-uninstall module successfully.")
+        set status = ##class(%IPM.Main).Shell("uninstall fc-keep-on-uninstall")
+        do $$$AssertStatusOK(status,"Uninstalled fc-keep-on-uninstall module successfully.")
+
+        do $$$AssertTrue(##class(%File).Exists(targetDir_"shared.txt"), "Kept directory resource's shared.txt")
+        do $$$AssertTrue(##class(%File).Exists(targetDir_"shared-file.txt"), "Kept file resource shared-file.txt")
+        do $$$AssertNotTrue(##class(%File).Exists(targetDir_"mine.txt"), "Deleted file resource mine.txt")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(),"An exception occurred in TestKeepOnUninstall.")
+    }
+    do ##class(%File).RemoveDirectoryTree(targetDir)
+}
+
+Method TestProtectedDirectoryFileCopy()
+{
+    do ..AssertProtectedDirectoryKept("fc-protected-dir")
+}
+
+Method TestProtectedDirectoryCSPApplication()
+{
+    do ..AssertProtectedDirectoryKept("fc-protected-csp")
+}
+
+/// Installs and uninstalls moduleName, whose resource targets the IPM module root without Overlay,
+/// and asserts that a file already in the module root survives both.
+/// The module root is the only protected directory a test can relocate, so it points at a temp
+/// directory here and a failure deletes nothing real.
+Method AssertProtectedDirectoryKept(moduleName As %String)
+{
+    set originalModuleRoot = ##class(%IPM.Repo.UniversalSettings).GetValue(##class(%IPM.Repo.UniversalSettings).#ModuleRoot)
+    set moduleRoot = ##class(%IPM.Utils.File).CreateTempDirectory()
+    set sentinel = ##class(%File).Construct(moduleRoot, "sentinel.txt")
+    try {
+        set file = ##class(%Stream.FileCharacter).%New()
+        $$$ThrowOnError(file.LinkToFile(sentinel))
+        $$$ThrowOnError(file.Write("not this module's"))
+        $$$ThrowOnError(file.%Save())
+        kill file
+        set status = ##class(%IPM.Main).Shell("config set ModuleRoot "_moduleRoot)
+        do $$$AssertStatusOK(status, "Set ModuleRoot to "_moduleRoot)
+        // Without this the module would target the real module root, which a failure deletes.
+        if ##class(%IPM.Repo.UniversalSettings).GetModuleRoot() '= moduleRoot {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, "ModuleRoot is not "_moduleRoot))
+        }
+
+        set status = ##class(%IPM.Main).Shell("install "_moduleName)
+        do $$$AssertStatusOK(status, "Installed "_moduleName_" successfully.")
+        do $$$AssertTrue(##class(%File).Exists(##class(%File).Construct(moduleRoot, "copied.txt")), "Copied copied.txt into the protected directory")
+        do $$$AssertTrue(##class(%File).Exists(sentinel), "Kept sentinel.txt on install")
+
+        set status = ##class(%IPM.Main).Shell("uninstall "_moduleName)
+        do $$$AssertStatusOK(status, "Uninstalled "_moduleName_" successfully.")
+        do $$$AssertTrue(##class(%File).Exists(sentinel), "Kept sentinel.txt on uninstall")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(), "An exception occurred in AssertProtectedDirectoryKept for "_moduleName_".")
+    }
+    do ##class(%IPM.Repo.UniversalSettings).SetValue(##class(%IPM.Repo.UniversalSettings).#ModuleRoot, originalModuleRoot)
+    do ##class(%File).RemoveDirectoryTree(moduleRoot)
 }
 
 Method TestMakeDeployed()

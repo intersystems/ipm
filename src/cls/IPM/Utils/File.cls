@@ -1,3 +1,5 @@
+Include %IPM.Formatting
+
 /// Wraps a set of more robust file operations
 Class %IPM.Utils.File
 {
@@ -13,6 +15,72 @@ ClassMethod CreateDirectoryChain(pName As %String) As %Status
         set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Error creating directory chain %1: %2",pName,$zutil(209,$select(tReturn<0:-tReturn,1:tReturn))))
     }
     quit tSC
+}
+
+/// Returns 1 if deleting dir would delete a directory IRIS or IPM needs to run, because dir is
+/// one of those directories or an ancestor of one. Subdirectories, such as an application's own
+/// directory under csp/, are not protected. Database directories are protected too, both configured
+/// ones and any directory holding an IRIS.DAT.
+ClassMethod IsProtectedDirectory(dir As %String) As %Boolean
+{
+    if ##class(%Library.File).Exists(##class(%Library.File).Construct(dir, "IRIS.DAT")) {
+        return 1
+    }
+    set installDir = $system.Util.InstallDirectory()
+    set mgrDir = ##class(%Library.File).ManagerDirectory()
+    set cspDir = ##class(%Library.File).Construct(installDir, "csp")
+    set libDir = ##class(%Library.File).Construct(installDir, "lib")
+    set protectedDirs = $listbuild(
+        installDir,
+        $system.Util.DataDirectory(),
+        mgrDir,
+        $system.Util.BinaryDirectory(),
+        libDir,
+        cspDir,
+        // The Management Portal and Interoperability UI
+        ##class(%Library.File).Construct(cspDir, "sys"),
+        ##class(%Library.File).Construct(cspDir, "broker"),
+        ##class(%Library.File).Construct(cspDir, "enslib"),
+        // Installed Python packages and the IRIS iris module
+        ##class(%Library.File).Construct(mgrDir, "python"),
+        ##class(%Library.File).Construct(libDir, "python"),
+        // Holds IPM's own files
+        ##class(%IPM.Repo.UniversalSettings).GetModuleRoot()) _ ..DatabaseDirectories()
+    set dir = ..NormalizeForComparison(dir)
+    set pointer = 0
+    while $listnext(protectedDirs, pointer, protectedDir) {
+        if $extract(..NormalizeForComparison(protectedDir), 1, $length(dir)) = dir {
+            return 1
+        }
+    }
+    return 0
+}
+
+/// Returns the directory of every database in the instance configuration, including those outside mgr/.
+ClassMethod DatabaseDirectories() As %List [ Internal ]
+{
+    new $namespace
+    set $namespace = "%SYS"
+    set statement = ##class(%SQL.Statement).%New()
+    $$$ThrowOnError(statement.%PrepareClassQuery("Config.Databases", "List"))
+    set rs = statement.%Execute("*")
+    $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
+    set dirs = ""
+    while rs.%Next(.sc) {
+        $$$ThrowOnError(sc)
+        set dirs = dirs _ $listbuild(rs.%Get("Directory"))
+    }
+    $$$ThrowOnError(sc)
+    return dirs
+}
+
+/// Normalizes path as a directory so that a prefix match only matches whole path segments.
+/// Lowercases on every platform because Windows and macOS file systems are case-insensitive by default.
+/// On a case-sensitive file system a prefix match can then only match too much, which keeps files
+/// rather than deleting them or writes an extra warning.
+ClassMethod NormalizeForComparison(path As %String) As %String [ Private ]
+{
+    return $zconvert(##class(%Library.File).NormalizeDirectory(path), "L")
 }
 
 ClassMethod RemoveDirectoryTree(pRoot As %String) As %Status
@@ -40,11 +108,7 @@ ClassMethod RemoveDirectoryTree(pRoot As %String) As %Status
                 }
                 set pRoot = ##class(%Library.File).NormalizeDirectory(pRoot)
                 set stdout=""
-                set tCmd = $listbuild("ROBOCOPY",tEmptyDir,pRoot,"/MIR")
-                set tSC = ##class(%IPM.Utils.Module).RunCommand(, tCmd,.stdout,,.retCode)
-                if $$$ISERR(tSC) && ($get(retCode)<8) {
-                    set tSC=$$$OK
-                }
+                do ..RunRobocopy($listbuild("ROBOCOPY",tEmptyDir,pRoot,"/MIR"), .stdout)
             } catch e {
                 set tSC = e.AsStatus()
             }
@@ -121,6 +185,10 @@ ClassMethod CopyDir(
     set tSC = $$$OK
     set tBadSC = $$$ERROR($$$GeneralError,$$$FormatText("Error copying directory %1 to %2",pSource,pDest))
     try {
+        if ..DirectoriesOverlap(pSource, pDest) {
+            set message = $$$FormatText("Source %1 and target %2 are the same directory or one contains the other", pSource, pDest)
+            $$$ThrowStatus($$$ERROR($$$GeneralError, message))
+        }
         if $$$isUNIX {
             kill %objlasterror
             if '##class(%Library.File).CopyDir(pSource,pDest,1,.tCreated,pDeleteFirst) {
@@ -136,14 +204,10 @@ ClassMethod CopyDir(
             }
             set pSource = ##class(%Library.File).NormalizeDirectory(pSource)
             set pDest = ##class(%Library.File).NormalizeDirectory(pDest)
-            set tCmd = $listbuild("ROBOCOPY", pSource,pDest,"/E")
             if ('pVerbose) {
                 set stdout = ""
             }
-            set tSC = ##class(%IPM.Utils.Module).RunCommand(, tCmd,.stdout,,.retCode)
-            if $$$ISERR(tSC) && ($get(retCode)<8) {
-                set tSC=$$$OK
-            }
+            do ..RunRobocopy($listbuild("ROBOCOPY", pSource,pDest,"/E"), .stdout)
             if (pVerbose) {
                 for i=1:1:$get(tLog) {
                     write tLog(i),!
@@ -154,6 +218,64 @@ ClassMethod CopyDir(
         set tSC = $$$EMBEDSC(tBadSC,e.AsStatus())
     }
     quit tSC
+}
+
+/// Returns 1 if first and second are the same directory or one is inside the other. Embedded Python
+/// compares device and inode, so a symlink or bind mount that aliases the two is caught too. Without
+/// Python, or on a filesystem that reports inode 0, only the normalized paths are compared.
+ClassMethod DirectoriesOverlap(
+	first As %String,
+	second As %String) As %Boolean
+{
+    try {
+        return ..DirectoriesOverlapPython(first, second)
+    } catch {
+        set first = ##class(%File).NormalizeDirectory(first)
+        set second = ##class(%File).NormalizeDirectory(second)
+        return ($extract(first, 1, $length(second)) = second) || ($extract(second, 1, $length(first)) = first)
+    }
+}
+
+ClassMethod DirectoriesOverlapPython(
+	first As %String,
+	second As %String) As %Boolean [ Language = python ]
+{
+    import os
+
+    def same(a, b):
+        statA = os.stat(a)
+        statB = os.stat(b)
+        # An inode of 0 means the filesystem has no file IDs, so every file would compare equal.
+        if statA.st_ino == 0 or statB.st_ino == 0:
+            raise OSError("Filesystem does not report file IDs")
+        return (statA.st_dev, statA.st_ino) == (statB.st_dev, statB.st_ino)
+
+    def contains(outer, inner):
+        if not os.path.isdir(outer):
+            return False
+        path = os.path.abspath(inner)
+        while True:
+            if os.path.exists(path) and same(outer, path):
+                return True
+            parent = os.path.dirname(path)
+            if parent == path:
+                return False
+            path = parent
+
+    return contains(first, second) or contains(second, first)
+}
+
+/// Runs <var>command</var>, a ROBOCOPY command $list, and throws if it fails. ROBOCOPY exits with
+/// 0-7 on success and 8 or higher on failure. A command that never ran has no return code and fails.
+ClassMethod RunRobocopy(
+	command As %List,
+	ByRef stdout)
+{
+    set sc = ##class(%IPM.Utils.Module).RunCommand(, command, .stdout, , .returnCode)
+    if $$$ISERR(sc) && ($get(returnCode) '= "") && (returnCode < 8) {
+        set sc = $$$OK
+    }
+    $$$ThrowOnError(sc)
 }
 
 ClassMethod MakeDirectoryWriteable(
@@ -280,6 +402,40 @@ ClassMethod CreateTempDirectory(baseDirectory As %String = "") As %String
         $$$ThrowStatus($$$ERROR($$$GeneralError, "Failed to create temporary directory: " _ $zutil(209,-dir)))
     }
     return ##class(%File).NormalizeDirectory(dir)
+}
+
+/// Returns 1 if path is under installDir but not under dataDir. Copies there can fail, because the
+/// install directory can be read-only, for example in containers with durable %SYS.
+/// Returns 0 when the two directories are the same, because the install directory then holds the instance's
+/// data and is writable.
+/// <example>
+/// // Returns 1
+/// write ##class(%IPM.Utils.File).IsInInstallDirectoryOnly("/usr/irissys/csp/myapp/", "/usr/irissys/", "/durable/iris/")
+/// // Returns 0
+/// write ##class(%IPM.Utils.File).IsInInstallDirectoryOnly("/usr/irissys/csp/myapp/", "/usr/irissys/", "/usr/irissys/")
+/// </example>
+ClassMethod IsInInstallDirectoryOnly(
+	path As %String,
+	installDir As %String = {$system.Util.InstallDirectory()},
+	dataDir As %String = {$system.Util.DataDirectory()}) As %Boolean
+{
+    set path = ..NormalizeForComparison(path)
+    set dataDir = ..NormalizeForComparison(dataDir)
+    set installDir = ..NormalizeForComparison(installDir)
+    return ($extract(path, 1, $length(installDir)) = installDir) && ($extract(path, 1, $length(dataDir)) '= dataDir)
+}
+
+/// Writes a warning if target, a file or directory that resource is about to copy into, passes
+/// IsInInstallDirectoryOnly.
+ClassMethod WarnIfInInstallDirectory(
+	target As %String,
+	resource As %IPM.Storage.ResourceReference)
+{
+    if '..IsInInstallDirectoryOnly(target) {
+        return
+    }
+    set message = "WARNING: "_resource.Module.Name_" resource "_resource.Name_" copies to "_target_", which is in the install directory and can be read-only."
+    write !, $$$FormattedLine($$$Yellow, message)
 }
 
 /// Computes the SHA-256 hash of a file and returns it as a lowercase hex string (64 chars).

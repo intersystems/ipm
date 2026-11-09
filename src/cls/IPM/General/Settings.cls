@@ -13,7 +13,7 @@ Parameter DESCRIPTION = "General Package Manager Settings";
 /// rather than compile it.
 Property SuppressCompilation As %Boolean [ InitialExpression = 1 ];
 
-Property Key As %String [ InitialExpression = "PackageManager", ReadOnly ];
+Property Key As %String(MAXLEN = 255) [ InitialExpression = "PackageManager", ReadOnly ];
 
 /// The <var>MANAGEDEXTENT</var> parameter can be set to 0 (zero) to cause the Extent Manager
 /// to ignore this class. If set to 1 then the Extent Manager will register globals used by

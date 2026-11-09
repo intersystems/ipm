@@ -633,10 +633,6 @@ Method TestInterchangeableNameUpdate()
 
 
     // Cleanup by uninstalling module and removing zot repo
-    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#DefaultName _ " all -force")
-    do $$$AssertStatusOK(sc, "Unpublished default name from repo")
-    set sc = ##class(%IPM.Main).Shell("unpublish zot/" _ ..#ExternalName _ " all -force")
-    do $$$AssertStatusOK(sc, "Unpublished external name from repo")
     $$$ThrowOnError(##class(%IPM.Main).Shell("uninstall " _ ..#DefaultName))
     $$$ThrowOnError(##class(%IPM.Main).Shell("repo -n zot -delete"))
 }

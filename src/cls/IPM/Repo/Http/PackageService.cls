@@ -32,12 +32,7 @@ Method GetHttpRequest(tLocation As %IPM.DataType.RepoLocation = {..Location}) As
 
     set tRequest.FollowRedirect = 1
 
-    set tLocation = $$$URLDECODE(tLocation)
-    if ($piece(tLocation, "://")'["http") {
-        set tLocation = "https://" _ tLocation
-    }
-
-    do ##class(%Net.URLParser).Parse(tLocation,.tComponents)
+    do ##class(%IPM.DataType.RepoLocation).Parse($$$URLDECODE(tLocation), .tComponents)
 
     if ($$$lcase(tComponents("scheme")) [ "http") {
         if ($data(tComponents("host"))#2) {
@@ -49,15 +44,11 @@ Method GetHttpRequest(tLocation As %IPM.DataType.RepoLocation = {..Location}) As
         if ($$$lcase(tComponents("scheme")) = "https") {
             set tRequest.Https = 1
         }
-        if ($get(tComponents("path"))'="") {
+        if (tComponents("path")'="") {
             if '..#ALLOWPREFIXINLOCATION {
                 $$$ThrowStatus($$$ERROR($$$GeneralError,"Location should not contain a prefix"))
             }
-            set path = tComponents("path")
-            if ($extract(path,1,1)="/") {
-                set path = $extract(path,2,*)
-            }
-            set tRequest.Location = path
+            set tRequest.Location = tComponents("path")
         }
         if $extract(tRequest.Location, *) '= "/" {
             set tRequest.Location = tRequest.Location _ "/"

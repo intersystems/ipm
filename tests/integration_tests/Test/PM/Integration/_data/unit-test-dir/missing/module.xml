@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="unit-test-dir-missing.ZPM">
+    <Module>
+      <Name>unit-test-dir-missing</Name>
+      <Version>0.0.1</Version>
+      <Packaging>module</Packaging>
+      <UnitTest Name="/tests/" Package="UnitTestDir.Missing" Phase="test"/>
+    </Module>
+  </Document>
+</Export>

@@ -652,6 +652,20 @@ reinstall -env /path/to/env1.json;/path/to/env2.json example-package
 
 </command>
 
+<command name="show">
+<description>
+    Shows an installed module's details, what it contains, and the modules it depends on or is required by. Use list-dependents for modules that depend on it transitively.
+</description>
+
+<!-- Examples -->
+<example description="Shows the details, resources, and dependencies of the installed module MyModule.">
+    show MyModule
+</example>
+
+<!-- Parameters -->
+<parameter name="module" required="true" description="Name of an installed module" />
+</command>
+
 <command name="default-modifiers" dataPrefix="D">
 <description>
     Manages default modifiers to use for all package manager commands in the current namespace.
@@ -866,7 +880,7 @@ generate /my/path -export 00000,PacketName2,IgnorePacket2^00000,PacketName3,Igno
 	<parameter name="argument" required="false" description="Argument for `details` command" />
 	<example description="Show history of all packages in the current namespace in descending order">history find </example>
 	<example description="Show history of all packages in the current namespace where command starts with &quot;load&quot;">history find -DCommandString="load*"</example>
-	<example description="Show history of all packages in the current namespace where the command has been committed `to disk`. Note that committed != successful, as all actions in dev mode will be committed regardless of success.">history find -DCommitted=1</example>
+	<example description="Show history of all packages in the current namespace where the command has been committed `to disk`. Committed is not the same as successful, because a failed action can keep changes, for example in dev mode or without a transaction.">history find -DCommitted=1</example>
 	<example description="Show history of all packages in the current namespace where the command has errored">history find -DSucess="0*"</example>
 	<example description="Show history of all packages in the current namespace where start time is later than 2000-01-01 00:00:00">history find -DTimeStart=">2000-01-01 00:00:00"</example>
 	<example description="Show 5 history records in the current namespace in ascending order">history find -sort asc -limit 5</example>
@@ -1059,7 +1073,7 @@ ClassMethod ShellInternal(
 	pCommand As %String,
 	Output pException As %Exception.AbstractException) [ Internal ]
 {
-    new $$$DeprecationWarned
+    new $$$DeprecationWarned, $$$RepoLookupState
     // Keep a reference of the singleton, so subsequent .%Get() calls return the same instance
     set configReference = ##class(%IPM.General.EnvironmentConfig).%Get()
 
@@ -1069,10 +1083,15 @@ ClassMethod ShellInternal(
     if (tCommand '= "") {
         set tOneCommand = 1
     }
-    set introMessageList = ..BuildIntroMessages(.outOfBoxMessage)
+    // The intro is only shown in the interactive shell. Building it lists modules in every namespace.
+    if 'tOneCommand {
+        set introMessageList = ..BuildIntroMessages(.outOfBoxMessage)
+    }
     set tInShell = 0
     for {
         kill $$$DeprecationWarned
+        kill $$$RepoLookupState
+        set $$$RepoLookupState = ""
         try {
             // Have intro message just for first entrance to shell
             // Ensure not displayed if its just one command
@@ -1130,6 +1149,8 @@ ClassMethod ShellInternal(
                 do ..ListInstalled(.tCommandInfo)
             } elseif (tCommandInfo = "list-dependents") {
                 do ..ListDependents(.tCommandInfo)
+            } elseif (tCommandInfo = "show") {
+                do ##class(%IPM.General.ModuleSummary).Show(tCommandInfo("parameters","module"))
             } elseif (tCommandInfo = "orphans") {
                 do ..ListOrphans(.tCommandInfo)
             } elseif (tCommandInfo = "default-modifiers") {
@@ -1232,8 +1253,15 @@ ClassMethod DisplayError(pStatus As %Status)
 {
     if $$$ISERR(pStatus) {
         write !,$$$FormattedLine($$$Red, "ERROR!")
-        write " ",$system.Status.GetOneStatusText(pStatus)
+        write " ",..ErrorText(pStatus)
     }
+}
+
+/// Full text of status, without the "ERROR #nnnn: " prefix on each error.
+ClassMethod ErrorText(status As %Status) As %String
+{
+    set matcher = ##class(%Regex.Matcher).%New("(?m)^(\s*>\s*)?ERROR #-?\d+: ", $system.Status.GetErrorText(status))
+    return matcher.ReplaceAll("$1")
 }
 
 /// Show modules in Namespace and to go namespace
@@ -1523,7 +1551,9 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
         set tPathSrc=##class(%File).NormalizeDirectory(tPath_"\"_tSrc)
         do ##class(%IPM.Storage.ModuleTemplate).ExportResources(tPathSrc,tExp)
     }
-    do tTemplate.ReadResources(tSrc)
+    set tests = "tests"
+    do ##class(%Library.Prompt).GetString("Enter module tests folder:", .tests)
+    do tTemplate.ReadResources(tSrc, tests)
 
     // web applications
     do ##class(%IPM.Storage.ModuleTemplate).GetCSPApplications(.apps)
@@ -1575,7 +1605,7 @@ ClassMethod GenerateModuleXML(ByRef pCommandInfo) As %Status [ Internal ]
         do tTemplate.AddWebApps(tWebAppList,.tCSPapps) // tCSP - list of CSP (not REST apps)
         for i=1:1:$listlength(tCSPapps) {
             set tCSPPath = ""
-            do ##class(%Library.Prompt).GetString("    Enter path to csp files for "_$listget(tCSPapps,i)_": ", .tCSPPath)
+            do ##class(%Library.Prompt).GetString("    Enter path to csp files for "_$listget(tCSPapps,i)_", relative to the module folder: ", .tCSPPath)
             if (tCSPPath'="") {
                 do tTemplate.SetSourcePathForCSPApp($listget(tCSPapps,i),tCSPPath)
             }
@@ -2455,7 +2485,6 @@ ClassMethod Load(
 	ByRef pCommandInfo,
 	pLog As %IPM.General.AbstractHistory = "") [ Internal ]
 {
-	set devMode = $get(pCommandInfo("data", "DeveloperMode"), 0)
     if pLog = "" {
 	    set log = ##class(%IPM.General.HistoryTemp).LoadInit("")
     } else {
@@ -2464,10 +2493,10 @@ ClassMethod Load(
 	try {
 		do ..LoadInternal(.pCommandInfo, log)
 	} catch Ex {
-		$$$ThrowOnError(log.Finalize(Ex.AsStatus(), devMode))
+		$$$ThrowOnError(log.Finalize(Ex.AsStatus()))
 		throw Ex
 	}
-	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+	$$$ThrowOnError(log.Finalize($$$OK))
 }
 
 ClassMethod ExecuteCOS(ByRef commandInfo)
@@ -2507,58 +2536,62 @@ ClassMethod LoadInternal(
     if ##class(%File).Exists(tDirectoryName) && ((extension="tgz") || (extension="tar.gz")) {
         set tTargetDirectory = ##class(%IPM.Utils.File).CreateTempDirectory(##class(%SYS.System).TempDirectory())
         set tTempExtractionRoot = tTargetDirectory
-        if $get(pCommandInfo("data", "Verbose")) {
-            write !,"Extracting archive to ",tTargetDirectory
-        }
-        $$$ThrowOnError(##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory))
-        // Try to locate the top-level module.xml file
-        if $get(pCommandInfo("data", "Verbose")) {
-            write !,"Trying to locate module.xml file in ", tTargetDirectory
-        }
-        set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
-        if (tCount = 0) {
-            $$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
-        }
-
-        // The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
-        set tModuleFilePath = $listget(tList(tCount), *)
-        set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
-        if $get(pCommandInfo("data", "Verbose")) {
-            write !,"Found "_tCount_" results. They are: "
-            set idx = ""
-            for {
-                set idx = $order(tList(idx))
-                quit:(idx="")
-                write !, $char(9), $list(tList(idx), *)
+        try {
+            if $get(pCommandInfo("data", "Verbose")) {
+                write !,"Extracting archive to ",tTargetDirectory
             }
-            write !, "Using module.xml file at ", tModuleFilePath
+            $$$ThrowOnError(##class(%IPM.General.Archive).Extract(tDirectoryName, tTargetDirectory))
+            // Try to locate the top-level module.xml file
+            if $get(pCommandInfo("data", "Verbose")) {
+                write !,"Trying to locate module.xml file in ", tTargetDirectory
+            }
+            set tCount = ##class(%IPM.Utils.File).FindFiles(tTargetDirectory, "module.xml", .tList)
+            if (tCount = 0) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
+            }
+
+            // The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
+            set tModuleFilePath = $listget(tList(tCount), *)
+            set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
+            if $get(pCommandInfo("data", "Verbose")) {
+                write !,"Found "_tCount_" results. They are: "
+                set idx = ""
+                for {
+                    set idx = $order(tList(idx))
+                    quit:(idx="")
+                    write !, $char(9), $list(tList(idx), *)
+                }
+                write !, "Using module.xml file at ", tModuleFilePath
+            }
+
+            // For tarballs, copy the extracted content to <ModuleRoot>/<name>/<version>/
+            // and clean up the temp extraction directory. Directory loads are left in-place so that
+            // live-edit workflows (mounted volumes, bootstrap) continue to work without re-loading.
+            set tModuleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromPath(tTargetDirectory, .tFound)
+            if 'tFound {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"No Module element found in module.xml at "_tTargetDirectory))
+            }
+            set tFinalDirectory = ##class(%Library.File).NormalizeDirectory(
+                ##class(%IPM.Repo.UniversalSettings).GetModuleRoot() _ tModuleObj.Name _ "/" _ tModuleObj.VersionString)
+            if ##class(%File).DirectoryExists(tFinalDirectory) {
+                $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tFinalDirectory))
+            }
+            $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tFinalDirectory))
+            // Destination was just created empty above, so pDeleteFirst=0 is intentional.
+            // If CopyDir fails partway through, tFinalDirectory may be left in a partial state.
+            $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(tTargetDirectory, tFinalDirectory, 0))
+            $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tTempExtractionRoot))
+            set tTargetDirectory = tFinalDirectory
+        } catch e {
+            // Ignore the cleanup status so the original error is the one reported.
+            do ##class(%IPM.Utils.File).RemoveDirectoryTree(tTempExtractionRoot)
+            throw e
         }
     }
 
     // When loading a module from a local folder, there might be a <mod root>/.modules/ folder containing dependencies.
     // It's easier to configure a temporary repository than to handle this case in the dependency resolution code.
     set tTargetDirectory = $get(tTargetDirectory, tDirectoryName)
-
-    // For tarball and URL sources, copy the extracted content to <ModuleRoot>/<name>/<version>/
-    // and clean up the temp extraction directory. Directory loads are left in-place so that
-    // live-edit workflows (mounted volumes, bootstrap) continue to work without re-loading.
-    if $get(tTempExtractionRoot) '= "" {
-        set tModuleObj = ##class(%IPM.Utils.Module).GetModuleObjectFromPath(tTargetDirectory, .tFound)
-        if 'tFound {
-            $$$ThrowStatus($$$ERROR($$$GeneralError,"No Module element found in module.xml at "_tTargetDirectory))
-        }
-        set tFinalDirectory = ##class(%Library.File).NormalizeDirectory(
-            ##class(%IPM.Repo.UniversalSettings).GetModuleRoot() _ tModuleObj.Name _ "/" _ tModuleObj.VersionString)
-        if ##class(%File).DirectoryExists(tFinalDirectory) {
-            $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tFinalDirectory))
-        }
-        $$$ThrowOnError(##class(%IPM.Utils.File).CreateDirectoryChain(tFinalDirectory))
-        // Destination was just created empty above, so pDeleteFirst=0 is intentional.
-        // If CopyDir fails partway through, tFinalDirectory may be left in a partial state.
-        $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(tTargetDirectory, tFinalDirectory, 0))
-        $$$ThrowOnError(##class(%IPM.Utils.File).RemoveDirectoryTree(tTempExtractionRoot))
-        set tTargetDirectory = tFinalDirectory
-    }
 
     set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
     set tmpRepoMgr = ##class(%IPM.General.TempLocalRepoManager).%New(dotModules, 1)
@@ -2716,10 +2749,10 @@ ClassMethod Install(
             }
         }
     } catch ex {
-		$$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
+		$$$ThrowOnError(log.Finalize(ex.AsStatus()))
 		throw ex
 	}
-	$$$ThrowOnError(log.Finalize($$$OK, devMode))
+	$$$ThrowOnError(log.Finalize($$$OK))
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
@@ -2830,6 +2863,7 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
     if ( tModuleName["/" ) {
         set $listbuild(tRegistry, tModuleName) = $listfromstring(tModuleName, "/")
     }
+    set tServer = ""
     if ( tRegistry = "" ) {
         set tRS = ##class(%IPM.Repo.Http.Definition).PublishingServerFunc()
         if (tRS.%SQLCODE = 0) && tRS.%Next() {
@@ -2839,47 +2873,42 @@ ClassMethod Unpublish(ByRef pCommandInfo) [ Internal ]
         set tServer = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(tRegistry,,.tSC)
     }
     if ('$isobject(tServer)) {
-        write "Registry not found: "_tRegistry,!
-        return $$$ERROR(5001, "Registry not found: "_tRegistry)
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Registry not found: "_tRegistry))
     }
     set tVersion = $get(pCommandInfo("parameters","version"))
 
-    try {
-        set tManager = tServer.GetPublishingManager(.tSC)
-        $$$ThrowOnError(tSC)
-        $$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
+    set tManager = tServer.GetPublishingManager(.tSC)
+    $$$ThrowOnError(tSC)
+    $$$ThrowOnError(tManager.CheckUnpublishEnabled(.isEnabled, tServer.Name, tModuleName, tVersion))
 
-        if (isEnabled) {
-            set tResult = 0
-            set force = $data(pCommandInfo("modifiers","force"))
-            if 'force {
-                if ($$$lcase(tVersion)="all") {
-                    write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action!")
-                    set tHelp = "Enter ""Yes"" if you want to delete all package versions."
-                    set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
-                } else {
-                    write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action!")
-                    set tHelp = "Enter ""Yes"" if you want to delete selected package version."
-                    set tMsg = "Are you sure you want to delete the package """_tModuleName_" version "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
-                }
-
-                set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
-
-                if (tResponse '= $$$SuccessResponse) {
-                    $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
-                }
+    if (isEnabled) {
+        set tResult = 0
+        set force = $data(pCommandInfo("modifiers","force"))
+        if 'force {
+            if ($$$lcase(tVersion)="all") {
+                write $$$FormattedLine($$$Red, "Deleting a package and all its versions is an irreversible action!")
+                set tHelp = "Enter ""Yes"" if you want to delete all package versions."
+                set tMsg = "Are you sure you want to delete all versions of the package """_tModuleName_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
+            } else {
+                write $$$FormattedLine($$$Red, "Deleting a package version is an irreversible action!")
+                set tHelp = "Enter ""Yes"" if you want to delete selected package version."
+                set tMsg = "Are you sure you want to delete the package """_tModuleName_" version "_tVersion_""" from registry """_tServer.Name_""" ("_tServer.URL_")?"
             }
 
-            if (tResult || force) {
-                $$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
-                set msg = "Package deleted" _ $case(force, 1:" forcefully without user confirmation", :"")
-                write !!, msg
+            set tResponse = ##class(%Library.Prompt).GetYesNo(tMsg,.tResult,.tHelp)
+
+            if (tResponse '= $$$SuccessResponse) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError,"Operation cancelled."))
             }
-        } else {
-            write !,"The package could not be deleted (the registry denied the request)",!
         }
-    } catch ex {
-        write !!,$$$FormattedLine($$$Red, "ERROR! "), ex.DisplayString()
+
+        if (tResult || force) {
+            $$$ThrowOnError(tManager.Unpublish(tServer.Name, tModuleName, tVersion))
+            set msg = "Package deleted" _ $case(force, 1:" forcefully without user confirmation", :"")
+            write !!, msg
+        }
+    } else {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "The package could not be deleted (the registry denied the request)"))
     }
 }
 

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="multibyte-description.ZPM">
+    <Module>
+      <Name>multibyte-description</Name>
+      <Version>1.0.0</Version>
+      <Description>日本語の説明</Description>
+      <Packaging>module</Packaging>
+    </Module>
+  </Document>
+</Export>

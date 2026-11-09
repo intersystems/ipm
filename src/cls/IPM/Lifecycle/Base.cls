@@ -598,7 +598,8 @@ Method %Initialize(ByRef pParams) As %Status
         set preloadRoot = $get(pParams("RootDirectory"))_"preload"
         set verbose = $get(pParams("Verbose"))
         if ##class(%File).DirectoryExists(preloadRoot) {
-            set tSC = $system.OBJ.ImportDir(preloadRoot, "*", $select(verbose:"d",1:"-d")_$select($tlevel:"/multicompile=0", 1: ""), , 1, .tImported)
+            set tSC = $system.OBJ.ImportDir(preloadRoot, "*", $select(verbose:"d",1:"-d")_$select($tlevel:"/multicompile=0", 1: ""), .errorLog, 1, .tImported)
+            set tSC = ##class(%IPM.Utils.Module).RemoveUnsupportedFileErrors(tSC, .errorLog)
             if $$$ISERR(tSC) { quit }
             set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
             if $$$ISERR(tSC) { quit }
@@ -1131,7 +1132,8 @@ Method %Compile(ByRef pParams) As %Status
                     for {
                         set tOneResourceKey = $order(tOneResourceList(tOneResourceKey))
                         quit:(tOneResourceKey="")
-                        if (('tDevMode) && ($get(tOneResourceList(tOneResourceKey, "Deploy"))) && ('isKitBuild) && (..Module.Deployed)) {
+                        set tDeployed = $get(tOneResourceList(tOneResourceKey, "Deploy")) && ##class(%IPM.Utils.Module).IsDeployableType($piece(tOneResourceKey, ".", *))
+                        if (('tDevMode) && tDeployed && ('isKitBuild) && (..Module.Deployed)) {
                             continue
                         }
                         set tCompileFlagMap(tFlags,tResource.Name,tOneResourceKey) = ""
@@ -1870,17 +1872,14 @@ Method %MakeDeployed(ByRef pParams) As %Status
                 set tSC = ..OnDetermineResourceDeployability(.pParams,.tResourceInfo,.tDeploy)
                 $$$ThrowOnError(tSC)
 
-                if tDeploy {
-                    set tName = $piece(tResourceKey,".",1,*-1)
-                    set tExt = $$$ucase($piece(tResourceKey,".",*))
+                // Where deployment means something for another type, its resource processor
+                // handles it in OnBeforePhase/OnAfterPhase.
+                set tExt = $$$ucase($piece(tResourceKey,".",*))
+                if tDeploy && ##class(%IPM.Utils.Module).IsDeployableType(tExt) {
                     if (tExt = "CLS") {
                         set tDeployClassArray($piece(tResourceKey,".",1,*-1)) = ""
-                    } elseif (tExt = "MAC") || (tExt = "INT") {
-                        set tDeployRtnArray(tResourceKey) = ""
                     } else {
-                        // For other types, if deployment has meaning, the associated resource processor
-                        // class should handle it in OnBeforePhase/OnAfterPhase.
-                        continue
+                        set tDeployRtnArray(tResourceKey) = ""
                     }
                 }
             }

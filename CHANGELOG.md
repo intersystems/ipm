@@ -8,12 +8,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.10.11] - Unreleased
 
 ### Added
+- #1019: `show` displays an installed module's details, resources, and dependencies
 - #1290: `-skip-sync` flag on `load`, `install`, `update`, and `reinstall` skips recording the file hashes `sync` uses to detect changes
+- #1135: `KeepOnUninstall` attribute on `FileCopy` resources leaves the copied files in place on `uninstall` and `clean`, for files other modules may share
+- #1232: `FileCopy`, `CSPApplication`, and `ArtifactoryTarball` resources warn when they copy into the instance's install directory, which can be read-only, for example via `{$cspDir}` or `{$libDir}`. Instances whose install directory is also their data directory do not warn.
+- #150: `generate` asks for a tests folder (default `tests`) and adds a `UnitTest` resource for the test classes in it
 - #986: Database packaging: new `package-database` and `publish-database` commands create a package from a copy of the namespace's routines database, which installs via swapping of the routines database rather than compilation of source files. The module and its dependencies must be loaded into the namespace before packaging. Pass `-include-tests` to include test resources (`Scope="test"` or `Scope="verify"`), which are excluded by default.
 
 ### Fixed
+- #1023: `test` on a module with a `Scope="test"` class no longer fails in Compile with "Class does not exist". The class loads and compiles in the Test phase, as with `test -only`.
+- #1043: Loading a package resource or a `preload` directory skips files IRIS cannot import, such as macOS `.DS_Store` files, instead of failing or leaving preloaded classes uncompiled
+- #1248: Published module manifests no longer include `MarkedForUpdate`, so IPM versions before 0.10.7 can resolve them as dependencies
+- #1005: `test` and `verify` warn and skip a `UnitTest` resource whose directory holds no test classes, instead of failing with "Nothing to compile"
+- #1197: IPM installs on IRIS 2023.1 and earlier, which failed to compile `%IPM.Storage.ModuleTemplate`
+- #1083: IPM installs on IRIS 2022.1, which failed to compile the repository definition classes with a SAX parser error and `%IPM.General.LockFile` with `<NOLINE>`
 - #1274: A failed CPF merge now reports the source CPF file and the output of the merge in the error
+- #934: `FileCopy` and other directory copies fail without deleting anything when the source and target are the same directory (for example through a symlink or a Docker bind mount) or one contains the other, instead of deleting source files
+- #435: Copying or removing a directory on Windows now fails when ROBOCOPY cannot be run, instead of reporting success with no files copied
 - #1242: Deployed code is now installed into the database IPM maps each resource to, even on first install when an existing namespace mapping covers it
+- #634: Module parameter values, template folders, and other stored strings longer than 50 characters no longer fail to save with `ERROR #7201`
+- #300: `FileCopy` and `CSPApplication` resources no longer delete IRIS or IPM system directories such as `${cspdir}` or `${mgrdir}python/`, or any directory containing one, on install or uninstall. IPM copies into them without clearing them first, leaves them in place on uninstall, and warns
+- #1115: Improve ORAS registry error reporting and authentication:
+    - ORAS registry errors now name the repo and show the HTTP status and the registry's message
+    - ORAS registries using Basic authentication work
+    - Lookups warn about a repo whose credentials are rejected and continue with the other repos
+    - Shell errors are shown in full, including every error in a combined status, instead of being cut off at a trailing bracket
+    - `unpublish` now fails when the module or version is not found or the registry refuses the request, instead of printing the error and reporting success
+    - Credential checks no longer follow redirects from a registry's token endpoint, so credentials are not sent to another host
+- #1183: `load` of a tarball handles pax headers (written by macOS and Windows tar) and cleans up its temp directory on failure
+- #1236: `install` from filesystem repos and `load` read a module.xml in the encoding its XML declaration names, so multi-byte characters (such as Japanese text) no longer cause a SAX parser error when the system's default file encoding differs
+- #1283: `repo -o` rejects a URL with a path, such as `https://ghcr.io/myorg`, and suggests the equivalent `-url https://ghcr.io -namespace myorg`. An existing repo with a path shows that suggestion on `repo -list` and in a warning on lookups, which continue with the other repos.
+- #1281: Repos on one ORAS registry can use different namespaces, and repo URLs that differ only in form (scheme omitted, case of the host, default port, trailing slash) are rejected as duplicates, naming the existing repo. The generated `URLExists` and `URLOpen` methods of `%IPM.Repo.Http.Definition` are removed along with the `URL` index.
+- #1269: A dependency found in an ORAS repo under its other name (`Name` or `ExternalName`), or nested below the repo's namespace, installs instead of failing to pull.
+- A repo URL with no scheme whose host contains "http", such as `myhttp.example.com`, is no longer misread as having a scheme.
+- #1279: Loading a package installs its deployed code when the module sets `SourcesRoot` and every code resource is `Deploy="true"`
+- #1125: Loading a package installs `Deploy="true"` resources that packaging exports as source, such as include files, instead of skipping them
+- #1237: The `Committed` column of `history` now shows whether a failed `load`, `install` or `update` kept any changes. A `-dev` action rolled back before its first commit reads uncommitted, and one run with `-DNoTransaction=1` or `-DNoJournal=1` reads committed.
+- #806: Web applications in a module.xml from `generate` now load instead of failing with "The following invalid attributes were found". A CSP application's source files are deployed with a `FileCopy` resource, and enabling JWT no longer fails with `<UNDEFINED>`.
+- #503: `generate` names each package resource after the deepest package its classes share, such as `MyApp.Local.PKG` instead of `MyApp.PKG`
+- `generate` stops with an error when the source folder does not exist, instead of writing a module.xml with no code resources
 
 ## [0.10.10] - 2026-10-14
 

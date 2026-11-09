@@ -38,8 +38,9 @@ Property UserName As %Library.Username [ InitialExpression = {$username}, Requir
 /// Status of the action. If the action is still in progress, this will be 0. Otherwise, it will be the status code of the action.
 Property Success As %Status [ InitialExpression = 0, Required ];
 
-/// Whether the action has been permanantly written "to disk". A non-committed action has been rolled back.
-/// In non developer mode, this indicates whether the action was successful. In developer mode, this is always true.
+/// Whether any of the action's changes were kept, either by a commit or by writing outside a transaction.
+/// A non-committed load, install or update wrote nothing or was rolled back.
+/// Uninstall runs without a transaction, so for it this only shows whether it succeeded.
 Property Committed As %Boolean [ InitialExpression = 0, Required ];
 
 /// The command string that triggered the action
@@ -115,13 +116,19 @@ Method SetName(pName As %String) As %Status
     quit ..%Save()
 }
 
-Method Finalize(
-	status As %Status,
-	dev As %Boolean = 0) As %Status
+/// Call wherever the action's changes become durable, so a later failure still reads as committed.
+Method SetCommitted()
+{
+    $$$ThrowOnError(..%Reload())
+    set ..Committed = 1
+    $$$ThrowOnError(..%Save())
+}
+
+Method Finalize(status As %Status) As %Status
 {
     $$$ThrowOnError(..%Reload())
     set ..Success = status
-    set ..Committed = (dev = 1) || $$$ISOK(status)
+    set ..Committed = ..Committed || $$$ISOK(status)
     set ..TimeEnd = $zdatetime($now(), 3)
     return ..%Save()
 }
