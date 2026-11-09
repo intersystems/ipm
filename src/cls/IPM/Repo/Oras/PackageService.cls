@@ -404,9 +404,16 @@ Method AddModulesFromTags(
         }
 
         // get metadata from annotations
-        set metadata = ..GetPackageMetadata(..Location, name, tag, "", client)
-        if (metadata = "") {
-            // Tag exists in the tag list but manifest is unreachable — skip silently
+        try {
+            set metadata = ..GetPackageMetadata(..Location, name, tag, "", client)
+        } catch e {
+            // One unreadable manifest should not hide the package's other versions. Rejected
+            // credentials fail every version, so they still throw.
+            set e = ..ClassifyException(e, ..ModuleNameFromRepository(name))
+            if e.%IsA("%IPM.Repo.Oras.HttpException") && e.CredentialsRejected {
+                throw e
+            }
+            do ##class(%IPM.General.LogManager).Warning("Skipping " _ ..ModuleNameFromRepository(name) _ " " _ tag _ ": " _ $system.Status.GetErrorText(e.AsStatus()))
             continue
         }
         set artifactMetadata = ##class(%IPM.Repo.Oras.ArtifactMetadata).%New()

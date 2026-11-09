@@ -63,6 +63,8 @@ ClassMethod GetLines(
     do ..AddField(lines, "Description", $zstrip($translate(module.Description, $char(10, 13), "  "), "<=>W"))
     do ..AddField(lines, "Root", module.Root)
     do ..AddField(lines, "Mode", $select(module.DeveloperMode: "developer", module.Deployed: "deployed", 1: ""))
+    // Every other packaging value installs from source.
+    do ..AddField(lines, "Packaging", $select(module.Packaging = "database": "database", 1: ""))
     do ..AddField(lines, "Repository", module.Repository)
     do ..AddField(lines, "Last updated", module.LastUpdated)
 

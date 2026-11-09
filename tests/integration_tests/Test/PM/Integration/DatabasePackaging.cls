@@ -828,6 +828,11 @@ Method TestMappingsAndPostSwapFailure()
 
     set output = ..CaptureCall("%IPM.Main", "Shell", "update module-with-mappings -path " _ brokenDir _ " -swap-db")
     do $$$AssertTrue(output [ "a later step failed", "Update fails after the swap")
+    set history = ##class(%IPM.General.History).GetHistory(, , 1)
+    if $$$AssertTrue(history.%Next(), "History entry found for the failed update") {
+        do $$$AssertNotEquals(history.%Get("Success"), 1, "History records the update as failed")
+        do $$$AssertEquals(history.%Get("Committed"), 1, "History records the update as committed, since the swap was kept")
+    }
     set module = ##class(%IPM.Storage.Module).NameOpen("module-with-mappings")
     do $$$AssertEquals($select($isobject(module): module.VersionString, 1: ""), "2.0.0", "Module record kept at the new version")
     do $$$AssertNotTrue(##class(%IPM.Storage.Module).NameExists("dep-with-mapping"), "Dropped dependency's record removed")

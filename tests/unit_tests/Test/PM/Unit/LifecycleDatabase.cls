@@ -144,6 +144,31 @@ Method TestFileCopyExpressionSourceNotStaged()
     do ##class(%IPM.Utils.File).RemoveDirectoryTree(targetDir)
 }
 
+/// The packaged module.xml must decode its source per the encoding declaration and keep multi-byte
+/// characters. A UTF8 default file translation table makes a character-stream read decode twice.
+Method TestPackageModuleXMLKeepsMultibyteCharacters()
+{
+    set targetDir = ##class(%IPM.Utils.File).CreateTempDirectory()
+    set module = ##class(%IPM.Storage.Module).%New()
+    set module.Name = "multibyte-description"
+    set module.Root = ##class(%Library.File).NormalizeDirectory("/home/irisowner/zpm/tests/integration_tests/Test/PM/Integration/_data/multibyte-description/")
+    set lifecycle = ##class(%IPM.Lifecycle.Database).%New(module)
+
+    set nlsTable = ##class(%SYS.NLS.Table).%New("Process")
+    set originalFileTable = nlsTable.GetIOTable(3)
+    do nlsTable.SetIOTable(3, "UTF8")
+    try {
+        do lifecycle.WritePackageModuleXML(targetDir, "abc", "2026.1")
+        set packaged = ##class(%IPM.Utils.Module).GetModuleObjectFromPath(targetDir, .found)
+        do $$$AssertTrue(found, "Packaged module.xml parses")
+        do $$$AssertEquals(packaged.Description, $char(26085, 26412, 35486, 12398, 35500, 26126))
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus())
+    }
+    do nlsTable.SetIOTable(3, originalFileTable)
+    do ##class(%IPM.Utils.File).RemoveDirectoryTree(targetDir)
+}
+
 /// Returns an unsaved module holding one resource named resourceName handled by processorClass.
 Method NewModuleWithResource(
 	resourceName As %String,

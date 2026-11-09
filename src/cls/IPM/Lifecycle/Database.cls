@@ -799,7 +799,9 @@ Method WritePackageModuleXML(
 	irisVersion As %String)
 {
     set srcPath = ##class(%Library.File).NormalizeFilename("module.xml", ..Module.Root)
-    set baseStream = ##class(%Stream.FileCharacter).%New()
+    // Binary on both ends: the parser decodes per the encoding declaration, and the transform
+    // returns bytes already encoded per the declaration it writes.
+    set baseStream = ##class(%Stream.FileBinary).%New()
     $$$ThrowOnError(baseStream.LinkToFile(srcPath))
     $$$ThrowOnError(baseStream.Rewind())
 
@@ -807,7 +809,7 @@ Method WritePackageModuleXML(
     $$$ThrowOnError(##class(%XML.XSLT.Transformer).TransformStreamWithCompiledXSL(baseStream, compiled, .transformed))
 
     set outPath = ##class(%Library.File).NormalizeFilename("module.xml", targetDir)
-    set outStream = ##class(%Stream.FileCharacter).%New()
+    set outStream = ##class(%Stream.FileBinary).%New()
     $$$ThrowOnError(outStream.LinkToFile(outPath))
     $$$ThrowOnError(outStream.CopyFrom(transformed))
     $$$ThrowOnError(outStream.%Save())
@@ -957,7 +959,8 @@ Method ValidateBeforeSwap(
     do ..ValidateRoutinesDatabaseNotShared($namespace)
 
     set irisDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", packageDir)
-    set xmlStream = ##class(%Stream.FileCharacter).%New()
+    // Binary so the parser decodes per the encoding declaration, not the process's default file translation table
+    set xmlStream = ##class(%Stream.FileBinary).%New()
     $$$ThrowOnError(xmlStream.LinkToFile(##class(%Library.File).NormalizeFilename("module.xml", packageDir)))
     $$$ThrowOnError(##class(%XML.XPATH.Document).CreateFromStream(xmlStream, .xpathDoc))
 

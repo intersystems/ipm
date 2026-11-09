@@ -1356,9 +1356,12 @@ ClassMethod LoadNewModule(
         // A database install commits this transaction once its swap lands.
         set params("InstallTLevel") = tInitTLevel
         set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params, pLog)
-        if $$$ISOK(tSC) && 'tDeveloperMode && tUseTransactions && ($tlevel > tInitTLevel) {
-            tcommit
-            if $isobject(pLog) {
+        if 'tDeveloperMode && tUseTransactions {
+            if $$$ISOK(tSC) && ($tlevel > tInitTLevel) {
+                tcommit
+            }
+            // Also true when a database install committed and then failed. Its changes are kept.
+            if ($tlevel = tInitTLevel) && $isobject(pLog) {
                 do pLog.SetCommitted()
             }
         }

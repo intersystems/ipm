@@ -32,8 +32,15 @@ Method TestHeader()
 
     set deployed = ..NewModule()
     set deployed.Deployed = 1
+    set deployed.Packaging = "module"
     set lines = ##class(%IPM.General.ModuleSummary).GetLines(deployed, {}, [])
     do $$$AssertTrue(..LineIndex(lines, "Mode: deployed"))
+    do $$$AssertNotTrue(..AnyLineContains(lines, "Packaging"), "No packaging line for a module installed from source")
+
+    set database = ..NewModule()
+    set database.Packaging = "database"
+    set lines = ##class(%IPM.General.ModuleSummary).GetLines(database, {}, [])
+    do $$$AssertTrue(..LineIndex(lines, "Packaging: database"))
 }
 
 Method TestMultiLineText()
