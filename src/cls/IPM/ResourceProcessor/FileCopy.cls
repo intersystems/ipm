@@ -32,7 +32,8 @@ Property Defer As %Boolean [ InitialExpression = 0 ];
 /// If true, the copied file or directory is left in place when the module is uninstalled or cleaned.
 /// Use this for files that other modules may also expect at the target, since IPM does not track
 /// which module a shared file belongs to. Files this module alone uses can go in a separate resource
-/// without this flag, so they are still removed.
+/// without this flag, so they are still removed. Install still clears a directory target unless
+/// Overlay is set, so set both for a shared directory.
 Property KeepOnUninstall As %Boolean [ InitialExpression = 0 ];
 
 Method OnBeforePhase(
@@ -228,9 +229,15 @@ Method OnPhase(
             write:tVerbose !,"Keeping ",tTarget
             return $$$OK
         }
-        if 'copyAsFile && ##class(%IPM.Utils.File).IsProtectedDirectory(tTarget) {
-            write !, $$$FormattedLine($$$Yellow, "WARNING: "_tTarget_" is a protected IRIS or IPM directory. Leaving it in place.")
-            return $$$OK
+        if 'copyAsFile {
+            if ##class(%IPM.Utils.File).IsProtectedDirectory(tTarget) {
+                write !, $$$FormattedLine($$$Yellow, "WARNING: "_tTarget_" is a protected IRIS or IPM directory. Leaving it in place.")
+                return $$$OK
+            }
+            if ##class(%IPM.Utils.File).DirectoriesOverlap(tSource, tTarget) {
+                write !, $$$FormattedLine($$$Yellow, "WARNING: "_tTarget_" overlaps this resource's source "_tSource_". Leaving it in place.")
+                return $$$OK
+            }
         }
         write:tVerbose !,"Deleting ",tTarget
         if copyAsFile {

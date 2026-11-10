@@ -117,6 +117,42 @@ Method TestProtectedDirectoryCSPApplication()
     do ..AssertProtectedDirectoryKept("fc-protected-csp")
 }
 
+Method TestSourceTargetFileCopy()
+{
+    do ..AssertSourceKeptOnUninstall("filecopy")
+}
+
+Method TestSourceDirectoryCSPApplication()
+{
+    // An application with no Directory serves its resource folder in place.
+    do ..AssertSourceKeptOnUninstall("csp")
+}
+
+/// Loads a copy of the self-target/<var>fixture</var> module, whose resource targets or serves its own web/
+/// folder, and asserts that web/ survives uninstall.
+Method AssertSourceKeptOnUninstall(fixture As %String)
+{
+    set moduleName = "self-target-"_fixture
+    // Load a copy so a regression deletes the copy, not the checked-in fixture. The filecopy
+    // fixture's {$mgrDir} target points at this copy's web/.
+    set moduleDir = ##class(%File).NormalizeDirectory(moduleName, $system.Util.ManagerDirectory())
+    if (moduleDir = "") || (moduleDir '[ moduleName) {
+        $$$ThrowStatus($$$ERROR($$$GeneralError, "Unexpected module directory: "_moduleDir))
+    }
+    try {
+        $$$ThrowOnError(##class(%IPM.Utils.File).CopyDir(..GetModuleDir("self-target", fixture), moduleDir))
+        // The load may fail, as FileCopy refuses to copy web/ onto itself. Uninstall only needs the module installed.
+        do ##class(%IPM.Main).Shell("load -dev "_moduleDir)
+        do $$$AssertTrue(##class(%IPM.Storage.Module).NameExists(moduleName), moduleName_" is installed")
+        set status = ##class(%IPM.Main).Shell("uninstall "_moduleName)
+        do $$$AssertStatusOK(status, "Uninstalled "_moduleName_" successfully.")
+        do $$$AssertTrue(##class(%File).Exists(##class(%File).Construct(moduleDir, "web", "index.html")), "Kept web/index.html on uninstall")
+    } catch e {
+        do $$$AssertStatusOK(e.AsStatus(), "An exception occurred in AssertSourceKeptOnUninstall for "_moduleName_".")
+    }
+    do ##class(%IPM.Utils.File).RemoveDirectoryTree(moduleDir)
+}
+
 /// Installs and uninstalls moduleName, whose resource targets the IPM module root without Overlay,
 /// and asserts that a file already in the module root survives both.
 /// The module root is the only protected directory a test can relocate, so it points at a temp

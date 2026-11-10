@@ -414,6 +414,12 @@ Method DeleteCSPApp(pVerbose As %Boolean = 0) As %Status [ Internal ]
             write !, $$$FormattedLine($$$Yellow, "WARNING: "_..Directory_" is a protected IRIS or IPM directory. Leaving it in place.")
             set purgeFiles = 0
         }
+        // An application whose Directory is its resource folder serves the module's source in place.
+        set resourceDir = ##class(%File).NormalizeDirectory(..ResourceReference.Module.Root_..ResourceReference.Name)
+        if purgeFiles && ##class(%IPM.Utils.File).DirectoriesOverlap(resourceDir, ..Directory) {
+            write:pVerbose !, "Leaving "_..Directory_" in place because it overlaps this resource's source."
+            set purgeFiles = 0
+        }
         set tSC = ##class(%Library.EnsembleMgr).deletePortal(..Url,purgeFiles,pVerbose)
         if ($system.Status.GetErrorCodes(tSC) [ $$$ApplicationDoesNotExist) {
             // Not actually a problem - allow Clean/Uninstall to continue if it fails while trying to remove something that doesn't exist.
