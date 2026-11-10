@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - #1019: `show` displays an installed module's details, resources, and dependencies
-- #1290: `-skip-sync` flag on `load`, `install`, `update`, and `reinstall` skips recording the file hashes `sync` uses to detect changes
-- #1135: `KeepOnUninstall` attribute on `FileCopy` resources leaves the copied files in place on `uninstall` and `clean`, for files other modules may share
+- #1290: `-skip-sync` flag on `load`, `install`, `update`, and `reinstall` skips recording the file hashes `sync` uses to detect changes in developer mode
+- #1135: `KeepOnUninstall` attribute on `FileCopy` resources leaves the copied files in place on `uninstall` and `clean` for files other modules may share
 - #1232: `FileCopy`, `CSPApplication`, and `ArtifactoryTarball` resources warn when they copy into the instance's install directory, which can be read-only, for example via `{$cspDir}` or `{$libDir}`. Instances whose install directory is also their data directory do not warn.
 - #150: `generate` asks for a tests folder (default `tests`) and adds a `UnitTest` resource for the test classes in it
 
@@ -22,11 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1197: IPM installs on IRIS 2023.1 and earlier, which failed to compile `%IPM.Storage.ModuleTemplate`
 - #1083: IPM installs on IRIS 2022.1, which failed to compile the repository definition classes with a SAX parser error and `%IPM.General.LockFile` with `<NOLINE>`
 - #1274: A failed CPF merge now reports the source CPF file and the output of the merge in the error
-- #934: `FileCopy` and other directory copies fail without deleting anything when the source and target are the same directory (for example through a symlink or a Docker bind mount) or one contains the other, instead of deleting source files
+- #934: `FileCopy` and `CSPApplication` copies that would clear or copy into their own source (for example through a symlink or a Docker bind mount) fail without deleting anything, instead of deleting source files
+- `uninstall` and `clean` no longer delete a module's source folder when a `FileCopy` target or `CSPApplication` directory overlaps it
 - #435: Copying or removing a directory on Windows now fails when ROBOCOPY cannot be run, instead of reporting success with no files copied
 - #1242: Deployed code is now installed into the database IPM maps each resource to, even on first install when an existing namespace mapping covers it
 - #634: Module parameter values, template folders, and other stored strings longer than 50 characters no longer fail to save with `ERROR #7201`
-- #300: `FileCopy` and `CSPApplication` resources no longer delete IRIS or IPM system directories such as `${cspdir}` or `${mgrdir}python/`, or any directory containing one, on install or uninstall. IPM copies into them without clearing them first, leaves them in place on uninstall, and warns
+- #300: `FileCopy` and `CSPApplication` resources no longer delete IRIS or IPM system directories, such as `${cspdir}` or `${mgrdir}python/`, or any directory containing one. IPM copies into them without clearing them first, leaves them in place on uninstall, and warns.
 - #1115: Improve ORAS registry error reporting and authentication:
     - ORAS registry errors now name the repo and show the HTTP status and the registry's message
     - ORAS registries using Basic authentication work
@@ -38,8 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1236: `install` from filesystem repos and `load` read a module.xml in the encoding its XML declaration names, so multi-byte characters (such as Japanese text) no longer cause a SAX parser error when the system's default file encoding differs
 - #1283: `repo -o` rejects a URL with a path, such as `https://ghcr.io/myorg`, and suggests the equivalent `-url https://ghcr.io -namespace myorg`. An existing repo with a path shows that suggestion on `repo -list` and in a warning on lookups, which continue with the other repos.
 - #1281: Repos on one ORAS registry can use different namespaces, and repo URLs that differ only in form (scheme omitted, case of the host, default port, trailing slash) are rejected as duplicates, naming the existing repo. The generated `URLExists` and `URLOpen` methods of `%IPM.Repo.Http.Definition` are removed along with the `URL` index.
-- #1269: A dependency found in an ORAS repo under its other name (`Name` or `ExternalName`), or nested below the repo's namespace, installs instead of failing to pull.
-- A repo URL with no scheme whose host contains "http", such as `myhttp.example.com`, is no longer misread as having a scheme.
+- #1269: A dependency found in an ORAS repo under its other name (`Name` or `ExternalName`), or nested below the repo's namespace, installs instead of failing to pull
+- A repo URL with no scheme whose host contains "http", such as `myhttp.example.com`, is no longer misread as having a scheme
 - #1279: Loading a package installs its deployed code when the module sets `SourcesRoot` and every code resource is `Deploy="true"`
 - #1125: Loading a package installs `Deploy="true"` resources that packaging exports as source, such as include files, instead of skipping them
 - #1237: The `Committed` column of `history` now shows whether a failed `load`, `install` or `update` kept any changes. A `-dev` action rolled back before its first commit reads uncommitted, and one run with `-DNoTransaction=1` or `-DNoJournal=1` reads committed.
