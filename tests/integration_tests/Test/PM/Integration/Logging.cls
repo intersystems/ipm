@@ -95,6 +95,42 @@ Method TestLoadCapturesCompileOutput()
     do $$$AssertTrue(..FileContains(txtLogFile, "BaseMod.Class1"), "Compiled class name is present in the txt log file")
 }
 
+/// Tests that pip output from installing a PythonWheel resource is written to the .txt log file
+Method TestLoadCapturesPipOutput()
+{
+    set moduleDir = ..GetModuleDir("python-deps-tests", "lune-wheel-no-reqs")
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ moduleDir))
+
+    set files = ..GetLogFilesInDir(..DefaultLogFileDir)
+    set txtLogFile = $listget(files.%Get("txt"), 1)
+    do $$$AssertTrue(..FileContains(txtLogFile, "Successfully installed lune"), "pip output is present in the txt log file")
+}
+
+/// Tests that output from every resource type that produces IRIS output is written to the .txt log file
+Method TestLoadCapturesAllResourceTypes()
+{
+    set moduleDir = ..GetModuleDir("logging", "v1", "all-resources-mod")
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ moduleDir))
+
+    set files = ..GetLogFilesInDir(..DefaultLogFileDir)
+    set txtLogFile = $listget(files.%Get("txt"), 1)
+
+    set expected = $listbuild(
+        $listbuild("AllRes.SingleClass", "CLS resource"),
+        $listbuild("AllRes.Pkg.PackagedClass", "PKG resource"),
+        $listbuild("AllRes.inc", "INC resource"),
+        $listbuild("AllRes.rtn", "MAC resource"),
+        $listbuild("Imported global: ^AllRes", "GBL resource"),
+        $listbuild("AllRes.Msgs.LOC", "LOC resource"),
+        $listbuild("IRIS Merge completed successfully", "CPF resource")
+    )
+    set ptr = 0
+    while $listnext(expected, ptr, item) {
+        set $listbuild(text, description) = item
+        do $$$AssertTrue(..FileContains(txtLogFile, text), "Output of " _ description _ " is present in the txt log file")
+    }
+}
+
 /// Tests creation of a log file on the 'update' command
 Method TestUpdate()
 {

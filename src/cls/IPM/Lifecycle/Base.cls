@@ -384,7 +384,14 @@ Method %Clean(ByRef pParams) As %Status
                                 set tDeferArray(tClassKey) = ""
                                 continue
                             }
-                            set tDelSC = $system.OBJ.Delete(tClassKey,$select(tVerbose:"d",1:"-d"))
+                            do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
+                            try {
+                                set tDelSC = $system.OBJ.Delete(tClassKey,$select(tVerbose:"d",1:"-d"))
+                            } catch tDelEx {
+                                do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+                                throw tDelEx
+                            }
+                            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
                             if $$$ISERR(tDelSC) {
                                 $$$LogLine($system.Status.GetErrorText(tDelSC), $$$Warning)
                             }

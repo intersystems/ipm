@@ -1,5 +1,3 @@
-Include %IPM.Common
-
 Class %IPM.Storage.ModuleTemplate Extends %IPM.Storage.Module
 {
 
@@ -45,7 +43,7 @@ ClassMethod ExportOneResource(
         set workdir=##class(%File).NormalizeDirectory("")
     }
     #define export(%code, %file) Try {Set sc = $system.OBJ.ExportUDL(%code, %file,"/diffexport")} catch e {s sc=$$$ERROR($$$GeneralError,"Old version")} ##continue
-                                 Write:sc "Ok" If 'sc { $$$LogLine($system.Status.GetErrorText(sc), $$$Error, 1) }
+                                 Write:sc "Ok" Do:'sc $system.OBJ.DisplayError(sc)
 
     #define isGenerated(%code) ##class(%RoutineMgr).IsGenerated( %code )
     #define isPercented(%code) ("%" = $Extract(%code))

@@ -181,38 +181,52 @@ ClassMethod MergeCPF(
     set args($increment(args)) = ##class(%SYS.System).GetInstanceName()
     set args($increment(args)) = file
 
-    // Somehow, if the STDOUT is not set, the merge will silently fail
-    set flags = "/SHELL/LOGCMD/STDOUT=""zf100stdout""/STDERR=""zf100stderr"""
-    // Keeps the child from opening the caller's terminal
-    set flags = flags _ "/STDIN=""" _ ##class(%Library.Device).GetNullDevice() _ """"
-    set status = $zf(-100, flags, "iris", .args)
-    if status '= 0 {
-        set msg = $$$FormatText("Error merging CPF file '%1'. $zf(-100) exited with %2", $select(sourceFile = "": file, 1: sourceFile), status)
-        set details = ..ReadOutputFile("zf100stdout") _ ..ReadOutputFile("zf100stderr")
-        set details = details _ $char(13, 10) _ "See messages.log for details."
-        $$$ThrowStatus($$$ERROR($$$GeneralError, msg _ details))
-    }
-}
-
-/// Returns the non-blank lines of a merge output file in the process's current directory, each preceded by a newline.
-ClassMethod ReadOutputFile(name As %String) As %String [ Private ]
-{
-    set path = ##class(%File).NormalizeFilename(name, ##class(%SYSTEM.Process).CurrentDirectory())
-    if '##class(%File).Exists(path) {
-        return ""
-    }
-    set stream = ##class(%Stream.FileCharacter).%New()
-    if $$$ISERR(stream.LinkToFile(path)) {
-        return ""
-    }
-    set text = ""
-    while 'stream.AtEnd {
-        set line = $zstrip(stream.ReadLine(), "<>W")
-        if line '= "" {
-            set text = text _ $char(13, 10) _ line
+    // Child process output bypasses IRIS device redirection, so read it through a pipe and log each line as it arrives
+    set device = "|CPIPE|MergeCPF"
+    set io = $io
+    set oldZEOF = $system.Process.SetZEOF(1)
+    set output = ""
+    try {
+        do ##class(%SYS.System).WriteToConsoleLog("IPM CPF merge command: iris " _ args(1) _ " " _ args(2) _ " " _ args(3))
+        // Without a shell, so PipeExitCode can report the exit code on UNIX
+        open device:(/COMMAND="iris":/ARGS=args...:"R"):10
+        if '$test {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Unable to start 'iris merge' for CPF file '%1'", file)))
         }
+        for {
+            use device
+            read line
+            set atEnd = ($zeof = -1)
+            use io
+            set line = $zstrip(line, "<>WC")
+            if (line '= "") {
+                set output = output _ $char(13, 10) _ line
+                $$$LogLine(line, $select($extract(line, 1, 5) = "ERROR": $$$Error, 1: $$$Info))
+            }
+            if atEnd {
+                quit
+            }
+        }
+        set exitCode = $system.Process.PipeExitCode(device, .exitCodeStatus)
+        close device
+    } catch ex {
+        close device
+        use io
+        do $system.Process.SetZEOF(oldZEOF)
+        throw ex
     }
-    return text
+    use io
+    do $system.Process.SetZEOF(oldZEOF)
+
+    if (exitCode '= 0) {
+        set msg = $$$FormatText("Error merging CPF file '%1'. iris merge exited with '%2'", $select(sourceFile = "": file, 1: sourceFile), exitCode)
+        set details = output _ $char(13, 10) _ "See messages.log for details."
+        set sc = $$$ERROR($$$GeneralError, msg _ details)
+        if (exitCode = "") {
+            set sc = $$$EMBEDSC(sc, exitCodeStatus)
+        }
+        $$$ThrowStatus(sc)
+    }
 }
 
 }

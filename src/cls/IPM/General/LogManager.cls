@@ -82,7 +82,8 @@ Method InitializeLog(
         $$$ThrowOnError(##class(%File).CreateDirectoryChain(logDir))
 
         // Set file paths with timestamp
-        set baseFileName = $get(commandInfo, "command-not-parsed") _ "_" _ moduleName _ "_" _ ..TimeStampStart
+        // convert to URI format so that, if that any `/` characters are included in the command, they are not mistakenly included in the file name
+        set baseFileName = $zconvert($get(commandInfo, "command-not-parsed") _ "_" _moduleName _ "_" _ ..TimeStampStart, "O", "URI")
         set jsonFilePath = logDir _ baseFileName _ ".jsonl"
         set txtFilePath = logDir _ baseFileName _ ".txt"
 

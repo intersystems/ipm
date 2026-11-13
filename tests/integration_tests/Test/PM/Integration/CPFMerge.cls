@@ -102,6 +102,19 @@ Method TestCPFMerge()
     do $$$AssertTrue(##class(Security.Applications).Exists("/csp/my-test-webapp"))
 }
 
+/// Tests that the output of a successful CPF merge is written to the .txt log file
+Method TestCPFMergeOutputLogged()
+{
+    set logDir = ##class(%File).NormalizeDirectory("cpf-merge-logs", $$$FileTempDir)
+    do ##class(%File).RemoveDirectoryTree(logDir)
+    set sc = ##class(%IPM.Main).Shell("load -log-dir " _ logDir _ " " _ ..GetModuleDir(..#TargetModuleName))
+    do $$$AssertStatusOK(sc, "Loaded module successfully")
+
+    set txtLogFile = $zsearch(logDir _ "*.txt")
+    do $$$AssertTrue(..FileContains(txtLogFile, "IRIS Merge completed successfully"), "CPF merge output is present in the txt log file")
+    do ##class(%File).RemoveDirectoryTree(logDir)
+}
+
 Method TestCPFPackage()
 {
     set moduleDir = ..GetModuleDir(..#TargetModuleName)
@@ -187,6 +200,23 @@ Method TestInvalidCPFReportsDetails()
     set errorText = $system.Status.GetErrorText(sc)
     do $$$AssertTrue(errorText [ "invalid-section.cpf", "Error names the source CPF file: " _ errorText)
     do $$$AssertTrue(errorText [ "Invalid or duplicate section name BLAH", "Error includes merge output: " _ errorText)
+}
+
+/// Tests that the output and error of a failed CPF merge are written to the .txt log file
+Method TestInvalidCPFMergeLogged()
+{
+    set logDir = ##class(%File).NormalizeDirectory("cpf-merge-invalid-logs", $$$FileTempDir)
+    do ##class(%File).RemoveDirectoryTree(logDir)
+    set sc = ##class(%IPM.Main).Shell("load -log-dir " _ logDir _ " " _ ..GetModuleDir("cpf-merge-invalid"))
+    do $$$AssertStatusNotOK(sc, "Loading a module with an invalid CPF file fails")
+
+    set txtLogFile = $zsearch(logDir _ "*.txt")
+    do $$$AssertTrue(..GetLineInFile(txtLogFile, "IRIS Merge failed"), "IRIS Merge failed line appears in the txt log file")
+    do $$$AssertTrue(..GetLineInFile(txtLogFile, "Invalid or duplicate section name BLAH") [ "["_$$$Error_"]", "iris merge ERROR line is logged at "_$$$Error_" level")
+    do $$$AssertTrue(..GetLineInFile(txtLogFile, "invalid-section.cpf'") [ "["_$$$Error_"]", "CPF merge error naming the source file is logged at "_$$$Error_" level")
+
+    do ##class(%IPM.Main).Shell("uninstall cpf-merge-invalid -force -quiet")
+    do ##class(%File).RemoveDirectoryTree(logDir)
 }
 
 }
