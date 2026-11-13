@@ -173,8 +173,6 @@ Method WriteLogLine(
         $$$ThrowOnError(txtStream.MoveToEnd())
         do txtStream.WriteLine(timestamp _ " [" _ level _ "] " _ message)
         $$$ThrowOnError(txtStream.%Save())
-
-        return $$$OK
     }
     catch ex
     {
@@ -185,6 +183,7 @@ Method WriteLogLine(
         }
         return fullSc
     }
+    return sc
 }
 
 /// Write a standard final "Logging Complete" message to both the JSON and TXT log files and mark log as no longer initialized
