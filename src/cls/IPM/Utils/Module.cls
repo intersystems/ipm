@@ -2776,7 +2776,12 @@ ClassMethod EvaluateMacroHelper(pMacro As %String) As %String [ Internal, Privat
     $$$ThrowOnError(sc)
     set value = $classmethod("%IPM.Generated.MacroEval", "EvalMacro")
     do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
-    do $system.OBJ.Delete("%IPM.Generated.MacroEval", "-d")
+    try {
+        do $system.OBJ.Delete("%IPM.Generated.MacroEval", "-d")
+    } catch ex {
+        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+        throw ex
+    }
     do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
     return value
 }

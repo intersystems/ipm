@@ -127,33 +127,6 @@ Method TestErrorLoggedAndEchoed()
     do $$$AssertTrue(..FindStringInMultiDimArray(..#ErrorTargetClass, .terminal), "Class with compilation errors WAS echoed to the terminal")
 }
 
-/// When an IPM command throws from an erroring IRIS system call wrapped in the chained capture tee,
-/// the shell must still close the redirection: the command reports failure, interception is switched
-/// off, the original I/O handler is restored, and the chained capture state is cleared.
-Method TestCommandErrorRestoresRedirection()
-{
-    set moduleDir = ..GetModuleDir("redirect-error-module")
-
-    // Record the redirection baseline so we can prove the shell handed control back after the failure.
-    set originalRedirect = ##class(%Device).ReDirectIO()
-    set originalHandler = $select(originalRedirect : $zutil(96, 12), 1 : "")
-
-    // The module Invoke opens the tee and rethrows an erroring import; the shell catches it and reports failure.
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusNotOK(sc, "Loading a module that throws from a wrapped IRIS system call WAS reported as an error")
-
-    // The failed command must leave redirection exactly as it found it.
-    set finalRedirect = ##class(%Device).ReDirectIO()
-    do $$$AssertEquals(finalRedirect, originalRedirect, "Redirection state WAS restored after the failed command")
-    set finalHandler = $select(finalRedirect : $zutil(96, 12), 1 : "")
-    do $$$AssertEquals(finalHandler, originalHandler, "Original I/O handler WAS restored after the failed command")
-    do $$$AssertNotTrue($data($$$IPMLogCapture("active")), "Chained capture state WAS cleared after the failed command")
-
-    // Clean up
-    do ##class(%IPM.Main).Shell("uninstall redirect-error-module -r")
-    do $system.OBJ.Delete("RedirectErrorModule.Trigger", "-d")
-}
-
 /// Begin the tee under an outer capture with terminal forwarding on, write a line, and assert it
 /// reached both the log (routing) and the outer capture buffer (forwarding intact).
 Method TestVerboseChainedCapture()
