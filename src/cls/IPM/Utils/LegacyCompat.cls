@@ -40,7 +40,15 @@ ClassMethod UpdateSuperclassAndCompile(
         set qSpec = qSpec _ "/multicompile=0"
     }
 
-    quit $system.OBJ.CompileList(.pItems, .qSpec)
+    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
+    try {
+        set tSC = $system.OBJ.CompileList(.pItems, .qSpec)
+    } catch tEx {
+        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+        throw tEx
+    }
+    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+    quit tSC
 }
 
 }

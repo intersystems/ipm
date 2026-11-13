@@ -14,9 +14,16 @@ Method TestSimpleUninstallAll()
     set status = ##class(%IPM.Main).Shell("load " _ moduleDir)
     do $$$AssertStatusOK(status,"Loaded SimpleModule module successfully. " _ moduleDir)
 
-    // call "uninstall -f -all"
-    set status = ##class(%IPM.Main).Shell("uninstall -f -all")
+    // call "uninstall -f -all", logging verbose output
+    set logDir = ##class(%File).NormalizeDirectory("uninstall-logs", $$$FileTempDir)
+    do ##class(%File).RemoveDirectoryTree(logDir)
+    set status = ##class(%IPM.Main).Shell("uninstall -f -all -v -log-dir " _ logDir)
     do $$$AssertStatusOK(status,"Uninstalled everything successfully.")
+
+    // verify the delete output of a module's class was written to the txt log file
+    set txtLogFile = $zsearch(logDir _ "*.txt")
+    do $$$AssertTrue(..FileContains(txtLogFile, "Test.Test"), "Deleted class name is present in the txt log file")
+    do ##class(%File).RemoveDirectoryTree(logDir)
 
     // verify everything except IPM is uninstalled
     do ##class(%IPM.Main).GetListModules(,,.list)

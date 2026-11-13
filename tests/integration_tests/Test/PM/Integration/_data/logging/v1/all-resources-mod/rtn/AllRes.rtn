@@ -1,0 +1,13 @@
+^MAC^Save for Source Control^^~Format=Cache.S~^UTF8
+%RO
+AllRes^MAC^^^0
+#include AllRes
+	Quit
+.
+MyFunction() PUBLIC
+{
+	Quit $$$answer
+}
+
+
+

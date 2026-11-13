@@ -177,7 +177,14 @@ ClassMethod LoadModuleReference(
                 } elseif $data(qstruct("/compile")) {
                     kill qstruct("/compile")
                 }
-                set tSC = $system.OBJ.Load(tTmpStream.Filename,.qstruct, , .tLoaded)
+                do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(tVerbose)
+                try {
+                    set tSC = $system.OBJ.Load(tTmpStream.Filename,.qstruct, , .tLoaded)
+                } catch ex {
+                    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+                    throw ex
+                }
+                do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
                 set tSC = $$$ADDSC(tSC, ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tLoaded, .qstruct))
             }
             set errorMsg = "", success = 0
@@ -1215,7 +1222,14 @@ ClassMethod LoadNewModule(
         }
 
         // This loads the new version of the module into storage. Overrides the module context of the currently installed module, if it exists.
-        set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
+        do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(tVerbose)
+        try {
+            set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
+        } catch ex {
+            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+            throw ex
+        }
+        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
         $$$ThrowOnError(tSC)
 
         set tFirstLoaded = $order(tLoadedList(""))
@@ -1289,7 +1303,14 @@ ClassMethod LoadNewModule(
         }
         do ..LoadDependencies(tModule,, .params)
 
-        set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
+        do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(tVerbose)
+        try {
+            set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
+        } catch ex {
+            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+            throw ex
+        }
+        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
         $$$ThrowOnError(tSC)
         set tSC = tModule.%Reload()
         $$$ThrowOnError(tSC)
@@ -2063,7 +2084,7 @@ ClassMethod EndCaptureOutput(
     #dim tLast,tKey,tValue As %String
 
     // If this routine was nested within another chained capture, the correct I/O handler is restored. In the case that the chained capture is no longer active, the chained capture routine's prior I/O handler needs to be reinstated
-    if pCookie = $get($$$IPMLogCapture("chainedCaptureIOHandler"), -1) {
+    if ($data($$$IPMLogCapture("chainedCaptureIOHandler")) && (pCookie = $get($$$IPMLogCapture("chainedCaptureIOHandler")))) {
         if '$get($$$IPMLogCapture("active")) {
             // The chained log capture ended while this capture was on top, so restore the handler it replaced
             set tPriorIOHandler = $get($$$IPMLogCapture("priorIOHandler"))
@@ -2475,21 +2496,17 @@ ClassMethod PipInstall(
             write !,"Running "
             zwrite command
         }
-        if quiet {
-            // Redirect pip stdout/stderr to a sink stream so subprocess output doesn't bypass device suppression
-            set pipOutput = ##class(%Stream.TmpCharacter).%New()
-            set runStatus = ..RunCommand(cwd, command, .pipOutput, .pipOutput)
-            if $$$ISERR(runStatus) {
-                // pip's own diagnostics are what explains a failed install, so let them through the suppression
-                do pipOutput.Rewind()
-                while 'pipOutput.AtEnd {
-                    write !,pipOutput.ReadLine()
-                }
-                $$$ThrowStatus(runStatus)
-            }
-        } else {
-            $$$ThrowOnError(..RunCommand(cwd, command))
+        // $zf(-100) output bypasses IRIS device redirection, so capture it and route each line to the log
+        set pipOutput = ##class(%Stream.TmpCharacter).%New()
+        set pipOutput.LineTerminator = $char(10)
+        set runStatus = ..RunCommand(cwd, command, .pipOutput, .pipOutput)
+        // pip's own diagnostics are what explains a failed install, so let them through the suppression
+        set writeToTerminal = 'quiet || $$$ISERR(runStatus)
+        do pipOutput.Rewind()
+        while 'pipOutput.AtEnd {
+            $$$LogLine($zstrip(pipOutput.ReadLine(), ">", $char(13)), , writeToTerminal)
         }
+        $$$ThrowOnError(runStatus)
 
         // On Windows, pip stages the install in a directory Python creates with a protected ACL, and each entry it moves into target keeps that ACL
         if $$$isWINDOWS {
@@ -2748,9 +2765,24 @@ ClassMethod EvaluateMacroHelper(pMacro As %String) As %String [ Internal, Privat
 
     // If it reaches here, pMacro is a valid expression (although may be undefined).
     // We should throw an error instead of failing silently.
-    $$$ThrowOnError($system.OBJ.LoadStream(stream, "ck-d"))
+    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
+    try {
+        set sc = $system.OBJ.LoadStream(stream, "ck-d")
+    } catch ex {
+        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+        throw ex
+    }
+    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+    $$$ThrowOnError(sc)
     set value = $classmethod("%IPM.Generated.MacroEval", "EvalMacro")
-    do $system.OBJ.Delete("%IPM.Generated.MacroEval", "-d")
+    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
+    try {
+        do $system.OBJ.Delete("%IPM.Generated.MacroEval", "-d")
+    } catch ex {
+        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+        throw ex
+    }
+    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
     return value
 }
 

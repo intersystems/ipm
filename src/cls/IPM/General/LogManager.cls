@@ -82,7 +82,8 @@ Method InitializeLog(
         $$$ThrowOnError(##class(%File).CreateDirectoryChain(logDir))
 
         // Set file paths with timestamp
-        set baseFileName = $get(commandInfo, "command-not-parsed") _ "_" _ moduleName _ "_" _ ..TimeStampStart
+        // convert to URI format so that, if that any `/` characters are included in the command, they are not mistakenly included in the file name
+        set baseFileName = $zconvert($get(commandInfo, "command-not-parsed") _ "_" _moduleName _ "_" _ ..TimeStampStart, "O", "URI")
         set jsonFilePath = logDir _ baseFileName _ ".jsonl"
         set txtFilePath = logDir _ baseFileName _ ".txt"
 
@@ -175,11 +176,12 @@ Method WriteLogLine(
     }
     catch ex
     {
-        set sc = ex.AsStatus()
-        set consoleSc = ##class(%SYS.System).WriteToConsoleLog(ex.DisplayString())
-        if $$$ISERR(consoleSc) {
-            set sc = $system.Status.AppendStatus(sc,consoleSc)
+        set fullSc = ex.AsStatus()
+        set sc = ##class(%SYS.System).WriteToConsoleLog(ex.DisplayString())
+        if $$$ISERR(sc) {
+            set fullSc = $system.Status.AppendStatus(fullSc,sc)
         }
+        return fullSc
     }
     return sc
 }
@@ -366,7 +368,7 @@ wtab(col) [pad] public {
 fwd(string) [priorIOHandler,isRedirectOn] public {
     new priorIOHandler,isRedirectOn
 
-    if ($get($$$IPMLogCapture("active")) && '$get($$$IPMLogCapture("writeToTerminal"))) {
+    if ('$get($$$IPMLogCapture("writeToTerminal")) && $get($$$IPMLogCapture("active"))) {
         quit
     }
     set priorIOHandler = $get($$$IPMLogCapture("priorIOHandler"))
@@ -386,7 +388,11 @@ fwd(string) [priorIOHandler,isRedirectOn] public {
         }
     } catch ex {
         do ##class(%SYS.System).WriteToConsoleLog("Exception occurred when forwarding string '"_string_"' to the prior I/O handler or current device: "_ex.DisplayString())
-        do ##class(%SYS.System).WriteToConsoleLog("Restoring "_$zname_" as I/O handler and set I/O redirection switch to 'on'.")
+
+        use $io::("^"_$zname)
+        do ##class(%Device).ReDirectIO(isRedirectOn)
+
+        do ##class(%SYS.System).WriteToConsoleLog("Restored "_$zname_" as I/O handler and set I/O redirection switch to 'on'.")
     }
 
     use $io::("^"_$zname)
