@@ -2509,21 +2509,17 @@ ClassMethod PipInstall(
             write !,"Running "
             zwrite command
         }
-        if quiet {
-            // Redirect pip stdout/stderr to a sink stream so subprocess output doesn't bypass device suppression
-            set pipOutput = ##class(%Stream.TmpCharacter).%New()
-            set runStatus = ..RunCommand(cwd, command, .pipOutput, .pipOutput)
-            if $$$ISERR(runStatus) {
-                // pip's own diagnostics are what explains a failed install, so let them through the suppression
-                do pipOutput.Rewind()
-                while 'pipOutput.AtEnd {
-                    write !,pipOutput.ReadLine()
-                }
-                $$$ThrowStatus(runStatus)
-            }
-        } else {
-            $$$ThrowOnError(..RunCommand(cwd, command))
+        // $zf(-100) output bypasses IRIS device redirection, so capture it and route each line to the log
+        set pipOutput = ##class(%Stream.TmpCharacter).%New()
+        set pipOutput.LineTerminator = $char(10)
+        set runStatus = ..RunCommand(cwd, command, .pipOutput, .pipOutput)
+        // pip's own diagnostics are what explains a failed install, so let them through the suppression
+        set writeToTerminal = 'quiet || $$$ISERR(runStatus)
+        do pipOutput.Rewind()
+        while 'pipOutput.AtEnd {
+            $$$LogLine($zstrip(pipOutput.ReadLine(), ">", $char(13)), , writeToTerminal)
         }
+        $$$ThrowOnError(runStatus)
 
         // On Windows, pip stages the install in a directory Python creates with a protected ACL, and each entry it moves into target keeps that ACL
         if $$$isWINDOWS {

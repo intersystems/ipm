@@ -2,11 +2,33 @@ Class Test.PM.Integration.CPFMerge Extends Test.PM.Integration.Base
 {
 
 Parameter TargetModuleName As STRING = "cpf-merge";
+Parameter InvalidModuleName As STRING = "cpf-merge-invalid";
+
+Property OriginalGlobals8KB As %Integer [ Private ];
+
+Method OnBeforeOneTest(testName As %String) As %Status
+{
+    new $namespace
+    set $namespace = "%SYS"
+    set sc = ##class(Config.config).Get(.props)
+    if $$$ISERR(sc) {
+        quit sc
+    }
+    set ..OriginalGlobals8KB = props("globals8kb")
+    quit $$$OK
+}
 
 Method OnAfterOneTest() As %Status
 {
     do ..CleanupCPFArtifacts()
-    quit $$$OK
+    new $namespace
+    set $namespace = "%SYS"
+    set sc = ##class(Config.config).Get(.props)
+    if $$$ISERR(sc) {
+        quit sc
+    }
+    set props("globals8kb") = ..OriginalGlobals8KB
+    quit ##class(Config.config).Modify(.props)
 }
 
 Method OnAfterAllTests() As %Status
@@ -102,6 +124,19 @@ Method TestCPFMerge()
     do $$$AssertTrue(##class(Security.Applications).Exists("/csp/my-test-webapp"))
 }
 
+/// Tests that the output of a successful CPF merge is written to the .txt log file
+Method TestCPFMergeOutputLogged()
+{
+    set logDir = ##class(%File).NormalizeDirectory("cpf-merge-logs", $$$FileTempDir)
+    do ##class(%File).RemoveDirectoryTree(logDir)
+    set sc = ##class(%IPM.Main).Shell("load -log-dir " _ logDir _ " " _ ..GetModuleDir(..#TargetModuleName))
+    do $$$AssertStatusOK(sc, "Loaded module successfully")
+
+    set txtLogFile = $zsearch(logDir _ "*.txt")
+    do $$$AssertTrue(..FileContains(txtLogFile, "IRIS Merge completed successfully"), "CPF merge output is present in the txt log file")
+    do ##class(%File).RemoveDirectoryTree(logDir)
+}
+
 Method TestCPFPackage()
 {
     set moduleDir = ..GetModuleDir(..#TargetModuleName)
@@ -187,6 +222,23 @@ Method TestInvalidCPFReportsDetails()
     set errorText = $system.Status.GetErrorText(sc)
     do $$$AssertTrue(errorText [ "invalid-section.cpf", "Error names the source CPF file: " _ errorText)
     do $$$AssertTrue(errorText [ "Invalid or duplicate section name BLAH", "Error includes merge output: " _ errorText)
+}
+
+/// Tests that the output and error of a failed CPF merge are written to the .txt log file
+Method TestInvalidCPFMergeLogged()
+{
+    set logDir = ##class(%File).NormalizeDirectory("cpf-merge-invalid-logs", $$$FileTempDir)
+    do ##class(%File).RemoveDirectoryTree(logDir)
+    set sc = ##class(%IPM.Main).Shell("load -log-dir " _ logDir _ " " _ ..GetModuleDir(..#InvalidModuleName))
+    do $$$AssertStatusNotOK(sc, "Loading a module with an invalid CPF file fails")
+
+    set txtLogFile = $zsearch(logDir _ "*.txt")
+    do $$$AssertTrue(..GetLineInFile(txtLogFile, "IRIS Merge failed"), "IRIS Merge failed line appears in the txt log file")
+    do $$$AssertTrue(..GetLineInFile(txtLogFile, "Invalid or duplicate section name BLAH") [ "["_$$$Error_"]", "iris merge ERROR line is logged at "_$$$Error_" level")
+    do $$$AssertTrue(..GetLineInFile(txtLogFile, "invalid-section.cpf'") [ "["_$$$Error_"]", "CPF merge error naming the source file is logged at "_$$$Error_" level")
+
+    do ##class(%IPM.Main).Shell("uninstall " _ ..#InvalidModuleName _ " -force -quiet")
+    do ##class(%File).RemoveDirectoryTree(logDir)
 }
 
 }
