@@ -22,7 +22,7 @@ Method CleanupCPFArtifacts()
 {
     set originalNamespace = $namespace
     try {
-        do ##class(%IPM.Main).Shell("uninstall " _ ..#TargetModuleName _ " -force -quiet")
+        do ..Shell("uninstall " _ ..#TargetModuleName _ " -force -quiet")
     } catch {}
 
     new $namespace
@@ -54,7 +54,7 @@ Method TestCPFMerge()
     // During load, only the config-globals.cpf file should be merged
     set cookie = ""
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
+    set sc = ..Shell("load -v " _ moduleDir)
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .pLoadOutput)
     do $$$AssertStatusOK(sc, "Loaded module successfully")
     do $$$AssertTrue(..FindStringInMultiDimArray("config-globals.cpf", .pLoadOutput))
@@ -63,7 +63,7 @@ Method TestCPFMerge()
 
     // During MakeDeployed, only the actions.cpf file should be merged
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Main).Shell("cpf-merge makedeployed -v -only")
+    set sc = ..Shell("cpf-merge makedeployed -v -only")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .pMakeDeployedOutput)
     do $$$AssertStatusOK(sc, "MakeDeployed executed successfully")
     do $$$AssertNotTrue(..FindStringInMultiDimArray("config-globals.cpf", .pMakeDeployedOutput))
@@ -72,7 +72,7 @@ Method TestCPFMerge()
 
     // During custom phase "MyPhase", only the package-mapping.cpf file should be merged. Also, the SayHello Invoke should be executed.
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Main).Shell("cpf-merge myphase -v -only")
+    set sc = ..Shell("cpf-merge myphase -v -only")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .pMyPhaseOutput)
     do $$$AssertStatusOK(sc, "MyPhase executed successfully")
     do $$$AssertNotTrue(..FindStringInMultiDimArray("config-globals.cpf", .pMyPhaseOutput))
@@ -105,7 +105,7 @@ Method TestCPFMerge()
 Method TestCPFPackage()
 {
     set moduleDir = ..GetModuleDir(..#TargetModuleName)
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
+    set sc = ..Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded module successfully")
 
     set pkgDir = ##class(%File).NormalizeDirectory("cpf-merge-pkg", $$$FileTempDir)
@@ -113,7 +113,7 @@ Method TestCPFPackage()
     do ##class(%File).RemoveDirectoryTree(pkgDir)
     do ##class(%File).RemoveDirectoryTree(extractDir)
     try {
-        set sc = ##class(%IPM.Main).Shell("package " _ ..#TargetModuleName _ " -only -v -path " _ pkgDir)
+        set sc = ..Shell("package " _ ..#TargetModuleName _ " -only -v -path " _ pkgDir)
         do $$$AssertStatusOK(sc, "Packaged module with CPF resources successfully")
 
         // Verify CPF files land where DoMerge will look for them after install
@@ -145,13 +145,13 @@ Method TestSystemExpressions()
     set moduleDir = ..GetModuleDir(..#TargetModuleName)
 
     // Load the module first if not already loaded
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
+    set sc = ..Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded module successfully")
 
     // Run the custom phase that merges the CPF with system expressions
     set cookie = ""
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
-    set sc = ##class(%IPM.Main).Shell("cpf-merge testsystemexpressions -v -only")
+    set sc = ..Shell("cpf-merge testsystemexpressions -v -only")
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .pOutput)
     do $$$AssertStatusOK(sc, "TestSystemExpressions phase executed successfully")
     do $$$AssertTrue(..FindStringInMultiDimArray("system-expressions.cpf", .pOutput))
@@ -179,7 +179,7 @@ Method TestSystemExpressions()
 Method TestInvalidCPFReportsDetails()
 {
     set moduleDir = ..GetModuleDir(..#TargetModuleName)
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
+    set sc = ..Shell("load -v " _ moduleDir)
     do $$$AssertStatusOK(sc, "Loaded module successfully")
 
     set sc = ##class(%IPM.Main).Shell("cpf-merge testinvalidcpf -only")

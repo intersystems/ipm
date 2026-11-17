@@ -3,7 +3,36 @@ Include %sySecurity
 Class %IPM.Test.Utils
 {
 
+/// Calls a class method that returns a %Status. If it fails with ERROR #453 ("Cannot quiesce
+/// the system for namespace reactivation"), waits 10 seconds and calls it once more.
+/// IRIS 2026.3 preview intermittently fails namespace activation this way, and a retry after
+/// a short wait succeeds as often as a first attempt.
+/// <example>
+/// set sc = ##class(%IPM.Test.Utils).CallWithQuiesceRetry("%IPM.Main", "Shell", "load /path/to/module")
+/// </example>
+ClassMethod CallWithQuiesceRetry(
+	className As %String,
+	methodName As %String,
+	args...) As %Status
+{
+    set sc = $classmethod(className, methodName, args...)
+    // A failed iris merge reports #453 only in its output, which IPM embeds in a general error.
+    if $$$ISERR(sc) && ($system.Status.GetErrorText(sc) [ "#453") {
+        hang 10
+        set sc = $classmethod(className, methodName, args...)
+    }
+    return sc
+}
+
+/// Creates the namespace, its database and its default web application, retrying once on
+/// a namespace activation failure (see <method>CallWithQuiesceRetry</method>).
 ClassMethod CreateNamespace(pNSName As %String) As %Status
+{
+    return ..CallWithQuiesceRetry($classname(), "CreateNamespaceOnce", pNSName)
+}
+
+/// Skips the steps whose results already exist, so it is safe to call again after a failure.
+ClassMethod CreateNamespaceOnce(pNSName As %String) As %Status [ Internal ]
 {
     new $namespace
     set tSC = $$$OK
