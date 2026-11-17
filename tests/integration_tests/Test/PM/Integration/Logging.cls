@@ -103,7 +103,7 @@ Method TestLoadCapturesPipOutput()
 
     set files = ..GetLogFilesInDir(..DefaultLogFileDir)
     set txtLogFile = $listget(files.%Get("txt"), 1)
-    do $$$AssertTrue(..FileContains(txtLogFile, "Successfully installed lune"), "pip output is present in the txt log file")
+    do $$$AssertTrue(..FileContains(txtLogFile, "lune-1.6.2"), "pip output is present in the txt log file")
 }
 
 /// Tests that output from every resource type that produces IRIS output is written to the .txt log file
