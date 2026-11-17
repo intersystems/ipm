@@ -2,7 +2,7 @@ Class Test.PM.Integration.CPFMerge Extends Test.PM.Integration.Base
 {
 
 Parameter TargetModuleName As STRING = "cpf-merge";
-Parameter InvalidModuleName As STRING = "cpf-merge-invalid";
+Parameter InvalidCPFModuleName As STRING = "cpf-merge-invalid";
 
 Property OriginalGlobals8KB As %Integer [ Private ];
 
@@ -229,7 +229,7 @@ Method TestInvalidCPFMergeLogged()
 {
     set logDir = ##class(%File).NormalizeDirectory("cpf-merge-invalid-logs", $$$FileTempDir)
     do ##class(%File).RemoveDirectoryTree(logDir)
-    set sc = ##class(%IPM.Main).Shell("load -log-dir " _ logDir _ " " _ ..GetModuleDir(..#InvalidModuleName))
+    set sc = ##class(%IPM.Main).Shell("load -log-dir " _ logDir _ " " _ ..GetModuleDir(..#InvalidCPFModuleName))
     do $$$AssertStatusNotOK(sc, "Loading a module with an invalid CPF file fails")
 
     set txtLogFile = $zsearch(logDir _ "*.txt")
