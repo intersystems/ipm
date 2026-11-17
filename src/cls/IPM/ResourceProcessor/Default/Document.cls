@@ -359,7 +359,14 @@ Method OnLoad(
             $select($tlevel||..ResourceReference.Deploy:"/multicompile=0",1:"")
 
         if ..LoadAsDirectory {
-            set importSC = $system.OBJ.ImportDir(pFullResourcePath, "*"_..FilenameExtension, tFlags, .errorLog, 1, .pLoadedList)
+            do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(pVerbose)
+            try {
+                set importSC = $system.OBJ.ImportDir(pFullResourcePath, "*"_..FilenameExtension, tFlags, .errorLog, 1, .pLoadedList)
+            } catch ex {
+                do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+                throw ex
+            }
+            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
             $$$ThrowOnError(##class(%IPM.Utils.Module).RemoveUnsupportedFileErrors(importSC, .errorLog))
             set pLoadedList = "" // ImportDir returns as an array and clears the top node
             set tResourceKey = ""
@@ -374,7 +381,14 @@ Method OnLoad(
         } elseif (..Format = "%RO") {
             // This tolerates some unusual %RO header formats that $System.OBJ.Load does not respect.
             set pLoadedList = ""
-            set tSC = $$Import^%apiRTN(pFullResourcePath,"replace,compile="_pCompile,,,.tResult,$select(pVerbose:"d",1:"-d"))
+            do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(pVerbose)
+            try {
+                set tSC = $$Import^%apiRTN(pFullResourcePath,"replace,compile="_pCompile,,,.tResult,$select(pVerbose:"d",1:"-d"))
+            } catch ex {
+                do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+                throw ex
+            }
+            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
         } else {
             set tProcessed = 0
             set fileExt = $$$UPPER($piece(pFullResourcePath, ".", *))
@@ -387,7 +401,14 @@ Method OnLoad(
                         quit:'$isobject(tDocument)
                         quit:'tDocument.EvaluateExpression("/Export/Document", "node()", .tRes)
                         if $isobject(tRes),tRes.Size  {
-                            set tSC = $system.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
+                            do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(pVerbose)
+                            try {
+                                set tSC = $system.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
+                            } catch ex {
+                                do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+                                throw ex
+                            }
+                            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
                             set tProcessed = 1
                         }
                     } catch ex { }
@@ -408,7 +429,14 @@ Method OnLoad(
                 }
             }
             if 'tProcessed {
-                set tSC = $system.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
+                do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(pVerbose)
+                try {
+                    set tSC = $system.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
+                } catch ex {
+                    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+                    throw ex
+                }
+                do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
                 $$$ThrowOnError(tSC)
             }
         }

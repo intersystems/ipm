@@ -1,0 +1,4 @@
+Class AllRes.Pkg.PackagedClass
+{
+
+}

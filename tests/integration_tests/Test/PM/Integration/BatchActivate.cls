@@ -159,6 +159,41 @@ Method TestEnableMapSingleNamespace()
     do $$$AssertStatusOK(sc, "Cleaned up target namespace")
 }
 
+/// Verify enable -map with -remote maps IPM into a single namespace
+Method TestEnableMapSingleNamespaceRemote()
+{
+    set targetNs = "TEST_ENABLE_MAP_NS4"
+
+    set createdRepo = 0
+    if '##class(%IPM.Repo.Definition).ServerDefinitionKeyExists("oras") {
+        set sc = ##class(%IPM.Main).Shell("repo -name oras -o -url http://oras:5000 -publish 1")
+        do $$$AssertStatusOK(sc, "Configured ORAS registry")
+        set createdRepo = 1
+    }
+
+    // Ensure target namespace exists
+    set sc = ##class(%IPM.Test.Utils).CreateNamespace(targetNs)
+    do $$$AssertStatusOK(sc, "Created target namespace")
+
+    // Map IPM from current namespace into target namespace (quiet mode)
+    set sc = ##class(%IPM.Main).Shell("enable -map -ns " _ targetNs _ " -remote oras -q")
+    do $$$AssertStatusOK(sc, "enable -map -remote executed successfully")
+
+    // Verify mappings were created
+    set originalNs = $namespace
+    new $namespace
+    set $namespace = "%SYS"
+    do $$$AssertTrue(##class(Config.MapPackages).Exists(targetNs, "%IPM"), "%IPM package mapped")
+    do $$$AssertTrue(##class(Config.MapRoutines).Exists(targetNs, "%IPM.*"), "%IPM routines mapped")
+
+    // Cleanup
+    set $namespace = originalNs
+    set sc = ##class(%IPM.Test.Utils).DeleteNamespace(targetNs)
+    do $$$AssertStatusOK(sc, "Cleaned up target namespace")
+    set sc = ##class(%IPM.Main).Shell("repo -delete-all")
+    do $$$AssertStatusOK(sc, "Removed repositories")
+}
+
 /// Verify enable -map -repos batches activation across multiple namespaces
 Method TestEnableMapMultipleNamespacesWithRepos()
 {

@@ -142,7 +142,7 @@ ClassMethod ReportConflicts()
         }
     } catch e {
         set tSC = e.AsStatus()
-        do $system.OBJ.DisplayError(tSC)
+        $$$LogLine($system.Status.GetErrorText(tSC), $$$Error, 1)
     }
 }
 
