@@ -1,5 +1,6 @@
 /// Tests that %IPM.Utils.File:CopyDir refuses a source and target that overlap. Copying with
-/// delete-first onto an aliased target deletes each source file before copying it.
+/// delete-first onto an aliased target deletes each source file before copying it. Without
+/// delete-first, only a target that is the source or inside it is refused.
 Class Test.PM.Integration.CopyDirOverlap Extends %UnitTest.TestCase
 {
 
@@ -48,6 +49,29 @@ Method TestSourceInsideTarget()
 {
     set status = ##class(%IPM.Utils.File).CopyDir(..SubDir(), ..SourceDir())
     do $$$AssertStatusNotOK(status, "Copy into a parent of the source is refused")
+    do ..AssertSourceIntact()
+}
+
+Method TestSourceInsideTargetWithoutDelete()
+{
+    set status = ##class(%IPM.Utils.File).CopyDir(..SubDir(), ..SourceDir(), 0)
+    do $$$AssertStatusOK(status, "Copy into a parent of the source without deleting first succeeds")
+    do $$$AssertTrue(##class(%File).Exists(##class(%File).Construct(..SourceDir(), "app.js")), "app.js copied into the parent")
+    do ..AssertSourceIntact()
+}
+
+Method TestTargetInsideSourceWithoutDelete()
+{
+    set status = ##class(%IPM.Utils.File).CopyDir(..SourceDir(), ..SubDir(), 0)
+    do $$$AssertStatusNotOK(status, "Copy into a subdirectory of the source is refused without deleting first")
+    do ..AssertSourceIntact()
+}
+
+Method TestSymlinkedTargetWithoutDelete()
+{
+    do ..CreateLink(..LinkPath(), ..SourceDir())
+    set status = ##class(%IPM.Utils.File).CopyDir(..SourceDir(), ..LinkPath(), 0)
+    do $$$AssertStatusNotOK(status, "Copy onto a link to the source is refused without deleting first")
     do ..AssertSourceIntact()
 }
 
