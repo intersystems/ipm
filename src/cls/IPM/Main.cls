@@ -158,7 +158,7 @@ Creates a .tgz archive of module source files. Equivalent to the existing `packa
 <command name="package-database" dataPrefix="D">
 <summary>Packages a module as a copy of the namespace's routines database.</summary>
 <description>
-Creates an IRIS.DAT database package bundled in a .tgz containing IRIS.DAT, module.xml (with SHA-256 checksum), and a deps/ directory of dependency manifests and non-compiled resource files.
+Creates an IRIS.DAT database package bundled in a .tgz containing IRIS.DAT, module.xml (with SHA-256 checksum), a deps/ directory of dependency manifests, and non-compiled resource files. This module's resource files sit at the archive root and each dependency's sit in deps-files/&lt;name&gt;/.
 The package ships a copy of the namespace's routines database as it currently stands, so it contains all compiled code from every module installed there, not just this module's. Beyond compiling this module's own resources, packaging loads nothing into the namespace unless -include-tests is passed, so load the module and its dependencies before packaging.
 The database is dismounted for the duration of the copy, so the namespace cannot run code while packaging runs. Mirrored databases are not supported.
 </description>

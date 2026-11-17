@@ -468,6 +468,7 @@ Method TestPackagingAndInstallValidation()
 
     set tamperedIRISDAT = ##class(%Library.File).NormalizeFilename("IRIS.DAT", tamperDir)
     do ##class(%Library.File).Delete(tamperedIRISDAT)
+    // IRIS refuses to write a file named IRIS.DAT through a stream, so write elsewhere and rename.
     set tamperTmp = ##class(%Library.File).TempFilename("dat")
     set tamperedStream = ##class(%Stream.FileBinary).%New()
     $$$ThrowOnError(tamperedStream.LinkToFile(tamperTmp))
@@ -762,7 +763,7 @@ Method TestPythonDependencyPackaging()
         do $$$AssertSuccess("lune importable after database install")
         do $$$AssertEquals(..GetPythonVersion("lune"), "1.6.2", "lune version is the packaged one")
     } catch ex {
-        do $$$AssertFailure("Failed to import lune after database install: " _ ex.AsStatus())
+        do $$$AssertFailure("Failed to import lune after database install: " _ ex.DisplayString())
     }
 
     // Cleanup: wheels downloaded by ExportPythonDependencies during packaging

@@ -379,7 +379,7 @@ Method WarnUnrunnableInvokes()
 }
 
 /// Warns about <Global> resources: their data lives in the globals database, which is not packaged,
-/// and a database install has no Reload phase to load it.
+/// and a database install never runs a processor's Reload, which is what loads it.
 Method WarnGlobalsNotShipped(includeTests As %Boolean)
 {
     set modules = ..GetSelfAndDependencyModules()

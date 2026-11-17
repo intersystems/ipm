@@ -96,7 +96,12 @@ Method TestSharedDependencyListedOnce()
     set root = ..SaveModule("aa-root", $listbuild("bb-left", "cc-right"))
 
     set ordered = root.GetDependencyNames()
-    do $$$AssertEquals($listlength(ordered), 3, "Each dependency listed once: " _ $listtostring(ordered, ","))
+    do $$$AssertEquals($listlength(ordered), 3, "No extra entries: " _ $listtostring(ordered, ","))
+    for name = "zz-shared", "bb-left", "cc-right" {
+        set first = $listfind(ordered, name)
+        do $$$AssertTrue(first > 0, name _ " is listed")
+        do $$$AssertEquals($listfind(ordered, name, first), 0, name _ " is listed once")
+    }
     do $$$AssertEquals($listget(ordered, 1), "zz-shared", "Shared dependency precedes both dependents")
 }
 
