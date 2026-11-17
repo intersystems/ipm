@@ -237,7 +237,7 @@ Method TestInvalidCPFMergeLogged()
     do $$$AssertTrue(..GetLineInFile(txtLogFile, "Invalid or duplicate section name BLAH") [ "["_$$$Error_"]", "iris merge ERROR line is logged at "_$$$Error_" level")
     do $$$AssertTrue(..GetLineInFile(txtLogFile, "invalid-section.cpf'") [ "["_$$$Error_"]", "CPF merge error naming the source file is logged at "_$$$Error_" level")
 
-    do ##class(%IPM.Main).Shell("uninstall " _ ..#InvalidModuleName _ " -force -quiet")
+    do ##class(%IPM.Main).Shell("uninstall " _ ..#InvalidCPFModuleName _ " -force -quiet")
     do ##class(%File).RemoveDirectoryTree(logDir)
 }
 
