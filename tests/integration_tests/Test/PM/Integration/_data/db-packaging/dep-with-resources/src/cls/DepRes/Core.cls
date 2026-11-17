@@ -1,0 +1,4 @@
+Class DepRes.Core
+{
+
+}

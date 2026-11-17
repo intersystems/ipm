@@ -1,0 +1,4 @@
+Class DepWithGlobal.Main
+{
+
+}

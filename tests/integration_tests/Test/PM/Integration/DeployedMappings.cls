@@ -23,7 +23,7 @@ Method OnBeforeAllTests() As %Status
 
 Method OnBeforeOneTest(testName As %String) As %Status
 {
-    do $$$AssertStatusOK(##class(%IPM.Test.Utils).CreateNamespace(..#ScratchDB))
+    do $$$AssertStatusOK(##class(%IPM.Test.Utils).CreateNamespace(..#ScratchDB, 0))
     do $$$AssertStatusOK(##class(%IPM.Utils.Module).AddRoutineMapping($namespace, "DeployMapR*", , ..#ScratchDB))
     do $$$AssertStatusOK(##class(%IPM.Utils.Module).AddPackageMapping($namespace, "DeployMapP", ..#ScratchDB))
     quit $$$OK
