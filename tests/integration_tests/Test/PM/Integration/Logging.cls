@@ -110,7 +110,7 @@ Method TestLoadCapturesAllResourceTypes()
         $listbuild("AllResources.inc", "INC resource"),
         $listbuild("AllResources.rtn", "MAC resource"),
         $listbuild("Imported global: ^AllResources", "GBL resource"),
-        $listbuild("AllResources.Msgs.LOC", "LOC resource")
+        $listbuild("AllResources.Messages.LOC", "LOC resource")
     )
     set ptr = 0
     while $listnext(expected, ptr, item) {
