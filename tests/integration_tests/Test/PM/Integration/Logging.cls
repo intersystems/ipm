@@ -105,12 +105,12 @@ Method TestLoadCapturesAllResourceTypes()
     set txtLogFile = $listget(files.%Get("txt"), 1)
 
     set expected = $listbuild(
-        $listbuild("AllRes.SingleClass", "CLS resource"),
-        $listbuild("AllRes.Pkg.PackagedClass", "PKG resource"),
-        $listbuild("AllRes.inc", "INC resource"),
-        $listbuild("AllRes.rtn", "MAC resource"),
-        $listbuild("Imported global: ^AllRes", "GBL resource"),
-        $listbuild("AllRes.Msgs.LOC", "LOC resource")
+        $listbuild("AllResources.SingleClass", "CLS resource"),
+        $listbuild("AllResources.Pkg.PackagedClass", "PKG resource"),
+        $listbuild("AllResources.inc", "INC resource"),
+        $listbuild("AllResources.rtn", "MAC resource"),
+        $listbuild("Imported global: ^AllResources", "GBL resource"),
+        $listbuild("AllResources.Msgs.LOC", "LOC resource")
     )
     set ptr = 0
     while $listnext(expected, ptr, item) {

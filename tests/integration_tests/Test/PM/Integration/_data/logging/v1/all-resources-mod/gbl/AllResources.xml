@@ -2,7 +2,7 @@
 <Export generator="IRIS" version="26">
     <Global>
         <Node>
-            <Sub>^AllRes</Sub>
+            <Sub>^AllResources</Sub>
             <Data>Hello World</Data>
         </Node>
     </Global>

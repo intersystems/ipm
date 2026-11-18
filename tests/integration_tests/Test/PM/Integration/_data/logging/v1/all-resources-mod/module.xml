@@ -6,12 +6,12 @@
             <Version>1.0.0</Version>
             <Packaging>module</Packaging>
             <CPF Name="config-globals.cpf" />
-            <Resource Name="AllRes.SingleClass.CLS" />
-            <Resource Name="AllRes.Pkg.PKG" />
-            <Resource Name="AllRes.INC" />
-            <Resource Name="AllRes.MAC" />
-            <Resource Name="AllRes.GBL" />
-            <Resource Name="AllRes.Msgs.LOC" />
+            <Resource Name="AllResources.SingleClass.CLS" />
+            <Resource Name="AllResources.Pkg.PKG" />
+            <Resource Name="AllResources.INC" />
+            <Resource Name="AllResources.MAC" />
+            <Resource Name="AllResources.GBL" />
+            <Resource Name="AllResources.Msgs.LOC" />
         </Module>
     </Document>
 </Export>
