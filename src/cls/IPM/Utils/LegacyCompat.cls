@@ -1,4 +1,4 @@
-Include %IPM.Formatting
+Include (%IPM.Common, %IPM.Formatting)
 
 Class %IPM.Utils.LegacyCompat
 {
@@ -40,14 +40,7 @@ ClassMethod UpdateSuperclassAndCompile(
         set qSpec = qSpec _ "/multicompile=0"
     }
 
-    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
-    try {
-        set tSC = $system.OBJ.CompileList(.pItems, .qSpec)
-    } catch tEx {
-        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-        throw tEx
-    }
-    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+    $$$RedirectOutputToLog(1,set tSC = $system.OBJ.CompileList(.pItems, .qSpec))
     quit tSC
 }
 

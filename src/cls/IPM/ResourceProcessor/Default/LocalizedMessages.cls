@@ -28,14 +28,7 @@ Method OnBeforePhase(
     }
     if (pPhase = "Compile") {
         // Uses CompileList rather than Compile to support custom document type (.LOC)
-        do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
-        try {
-            set tSC = $system.OBJ.CompileList(..ResourceReference.Name,$select(tVerbose:"d",1:"-d")_..Flags)
-        } catch ex {
-            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-            throw ex
-        }
-        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+        $$$RedirectOutputToLog(1,set tSC = $system.OBJ.CompileList(..ResourceReference.Name,$select(tVerbose:"d",1:"-d")_..Flags))
     }
     quit $$$ADDSC(tSC,##class(%IPM.ResourceProcessor.LocalizationExport)$this.OnBeforePhase(pPhase,.pParams))
 }

@@ -66,14 +66,7 @@ Method OnPhase(
                 }
 
                 if '..ResourceReference.Preload {
-                    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
-                    try {
-                        set tSC = $system.OBJ.Load(resourcePath, $select(tVerbose:"/display", 1:"/nodisplay") _ "/nocompile")
-                    } catch ex {
-                        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-                        throw ex
-                    }
-                    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+                    $$$RedirectOutputToLog(1,set tSC = $system.OBJ.Load(resourcePath, $select(tVerbose:"/display", 1:"/nodisplay") _ "/nocompile"))
                     if $$$ISERR(tSC) {
                         quit
                     }

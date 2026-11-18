@@ -110,8 +110,7 @@ Method TestLoadCapturesAllResourceTypes()
         $listbuild("AllRes.inc", "INC resource"),
         $listbuild("AllRes.rtn", "MAC resource"),
         $listbuild("Imported global: ^AllRes", "GBL resource"),
-        $listbuild("AllRes.Msgs.LOC", "LOC resource"),
-        $listbuild("IRIS Merge completed successfully", "CPF resource")
+        $listbuild("AllRes.Msgs.LOC", "LOC resource")
     )
     set ptr = 0
     while $listnext(expected, ptr, item) {

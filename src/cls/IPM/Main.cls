@@ -3379,14 +3379,7 @@ ClassMethod Import(ByRef pCommandInfo)
                     if 'tQuiet {
                         write !,"Loading "_tSourceDir
                     }
-                    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(tVerbose)
-                    try {
-                        set tSC = $system.OBJ.ImportDir(tSourceDir,,tLoadFlags,,tRecurse,.tImportedArray,tListOnly)
-                    } catch tCaptureEx {
-                        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-                        throw tCaptureEx
-                    }
-                    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+                    $$$RedirectOutputToLog(tVerbose,set tSC = $system.OBJ.ImportDir(tSourceDir,,tLoadFlags,,tRecurse,.tImportedArray,tListOnly))
 
                     // Build $ListBuild list of loaded items
                     set tLoadedKey = ""
@@ -3402,14 +3395,7 @@ ClassMethod Import(ByRef pCommandInfo)
                     if 'tQuiet {
                         $$$LogLine("Loading "_tSourceFile, )
                     }
-                    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(tVerbose)
-                    try {
-                        set tSC = $system.OBJ.Load(tSourceFile,tLoadFlags,,.tLoadedList,tListOnly)
-                    } catch tCaptureEx {
-                        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-                        throw tCaptureEx
-                    }
-                    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+                    $$$RedirectOutputToLog(tVerbose,set tSC = $system.OBJ.Load(tSourceFile,tLoadFlags,,.tLoadedList,tListOnly))
                     set tLoadedList = $listfromstring(tLoadedList)
                 }
             } else {
@@ -3921,14 +3907,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
                     write !, $$$FormatText("Would install IPM version %1 from registry in namespace %2", targetVersion, currentNS)
                     continue
                 }
-                do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
-                try {
-                    do $system.OBJ.LoadStream(manifest, loadFlag)
-                } catch captureEx {
-                    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-                    throw captureEx
-                }
-                do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+                $$$RedirectOutputToLog(1,do $system.OBJ.LoadStream(manifest, loadFlag))
                 write !, "IPM enabled for namespace "_currentNS
             }
         } else {
@@ -3947,14 +3926,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
                 write !, $$$FormatText("Would install IPM using file at %1 in namespace %2", filePath, currentNS)
                 continue
             }
-            do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
-            try {
-                set tSC = $system.OBJ.Load(##class(%File).NormalizeFilename(targetIPMFileName, XMLDir), loadFlag)
-            } catch captureEx {
-                do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-                throw captureEx
-            }
-            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+            $$$RedirectOutputToLog(1,set tSC = $system.OBJ.Load(##class(%File).NormalizeFilename(targetIPMFileName, XMLDir), loadFlag))
             if $$$ISOK(tSC) {
                 set enabledNSList = enabledNSList_$listbuild(currentNS)
             } else {

@@ -178,14 +178,7 @@ ClassMethod LoadModuleReference(
                 } elseif $data(qstruct("/compile")) {
                     kill qstruct("/compile")
                 }
-                do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(tVerbose)
-                try {
-                    set tSC = $system.OBJ.Load(tTmpStream.Filename,.qstruct, , .tLoaded)
-                } catch ex {
-                    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-                    throw ex
-                }
-                do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+                $$$RedirectOutputToLog(tVerbose,set tSC = $system.OBJ.Load(tTmpStream.Filename,.qstruct, , .tLoaded))
                 set tSC = $$$ADDSC(tSC, ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tLoaded, .qstruct))
             }
             set errorMsg = "", success = 0
@@ -1250,14 +1243,7 @@ ClassMethod LoadNewModule(
         }
 
         // This loads the new version of the module into storage. Overrides the module context of the currently installed module, if it exists.
-        do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(tVerbose)
-        try {
-            set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
-        } catch ex {
-            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-            throw ex
-        }
-        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+        $$$RedirectOutputToLog(tVerbose,set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList))
         $$$ThrowOnError(tSC)
 
         set tFirstLoaded = $order(tLoadedList(""))
@@ -1334,14 +1320,7 @@ ClassMethod LoadNewModule(
         }
         do ..LoadDependencies(tModule,, .params)
 
-        do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(tVerbose)
-        try {
-            set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList)
-        } catch ex {
-            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-            throw ex
-        }
-        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+        $$$RedirectOutputToLog(tVerbose,set tSC = $system.OBJ.Load(pDirectory_"module.xml",$select(tVerbose:"d",1:"-d"),,.tLoadedList))
         $$$ThrowOnError(tSC)
         set tSC = tModule.%Reload()
         $$$ThrowOnError(tSC)
@@ -2803,24 +2782,10 @@ ClassMethod EvaluateMacroHelper(pMacro As %String) As %String [ Internal, Privat
 
     // If it reaches here, pMacro is a valid expression (although may be undefined).
     // We should throw an error instead of failing silently.
-    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
-    try {
-        set sc = $system.OBJ.LoadStream(stream, "ck-d")
-    } catch ex {
-        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-        throw ex
-    }
-    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+    $$$RedirectOutputToLog(1,set sc = $system.OBJ.LoadStream(stream, "ck-d"))
     $$$ThrowOnError(sc)
     set value = $classmethod("%IPM.Generated.MacroEval", "EvalMacro")
-    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
-    try {
-        do $system.OBJ.Delete("%IPM.Generated.MacroEval", "-d")
-    } catch ex {
-        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-        throw ex
-    }
-    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+    $$$RedirectOutputToLog(1,do $system.OBJ.Delete("%IPM.Generated.MacroEval", "-d"))
     return value
 }
 

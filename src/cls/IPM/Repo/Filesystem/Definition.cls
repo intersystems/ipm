@@ -194,14 +194,7 @@ Method AddCacheItem(
     set pVersionString = ""
     try {
         // Get list of what's in module.xml
-        do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
-        try {
-            set tSC = $system.OBJ.Load(pModuleFileName,"-d",,.tLoadedList,1)
-        } catch ex {
-            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-            throw ex
-        }
-        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+        $$$RedirectOutputToLog(1,set tSC = $system.OBJ.Load(pModuleFileName,"-d",,.tLoadedList,1))
         if $$$ISERR(tSC) {
             // Wasn't a valid file. We'll just continue.
             set tSC = $$$OK

@@ -384,14 +384,7 @@ Method %Clean(ByRef pParams) As %Status
                                 set tDeferArray(tClassKey) = ""
                                 continue
                             }
-                            do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(1)
-                            try {
-                                set tDelSC = $system.OBJ.Delete(tClassKey,$select(tVerbose:"d",1:"-d"))
-                            } catch tDelEx {
-                                do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-                                throw tDelEx
-                            }
-                            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+                            $$$RedirectOutputToLog(1,set tDelSC = $system.OBJ.Delete(tClassKey,$select(tVerbose:"d",1:"-d")))
                             if $$$ISERR(tDelSC) {
                                 $$$LogLine($system.Status.GetErrorText(tDelSC), $$$Warning)
                             }
@@ -603,14 +596,7 @@ Method %Initialize(ByRef pParams) As %Status
         set preloadRoot = $get(pParams("RootDirectory"))_"preload"
         set verbose = $get(pParams("Verbose"))
         if ##class(%File).DirectoryExists(preloadRoot) {
-            do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(verbose)
-            try {
-                set tSC = $system.OBJ.ImportDir(preloadRoot, "*", $select(verbose:"d",1:"-d")_$select($tlevel:"/multicompile=0", 1: ""), .errorLog, 1, .tImported)
-            } catch ex {
-                do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-                throw ex
-            }
-            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+            $$$RedirectOutputToLog(verbose,set tSC = $system.OBJ.ImportDir(preloadRoot, "*", $select(verbose:"d",1:"-d")_$select($tlevel:"/multicompile=0", 1: ""), .errorLog, 1, .tImported))
             set tSC = ##class(%IPM.Utils.Module).RemoveUnsupportedFileErrors(tSC, .errorLog)
             if $$$ISERR(tSC) { quit }
             set tSC = ##class(%IPM.Utils.LegacyCompat).UpdateSuperclassAndCompile(.tImported)
@@ -646,14 +632,7 @@ Method %Reload(ByRef pParams) As %Status
         quit:tRoot=""
 
         set tRoot = ##class(%File).NormalizeDirectory("",tRoot)
-        do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(0)
-        try {
-            set tSC = $system.OBJ.Load(tRoot_"module.xml","/nodisplay",.error,.tLoadedList)
-        } catch ex {
-            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
-            throw ex
-        }
-        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+        $$$RedirectOutputToLog(0,set tSC = $system.OBJ.Load(tRoot_"module.xml","/nodisplay",.error,.tLoadedList))
         quit:$$$ISERR(tSC)
 
         // Validate loaded module
