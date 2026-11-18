@@ -3907,7 +3907,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
                     write !, $$$FormatText("Would install IPM version %1 from registry in namespace %2", targetVersion, currentNS)
                     continue
                 }
-                $$$RedirectOutputToLog(1,do $system.OBJ.LoadStream(manifest, loadFlag))
+                do $system.OBJ.LoadStream(manifest, loadFlag)
                 write !, "IPM enabled for namespace "_currentNS
             }
         } else {
@@ -3926,7 +3926,7 @@ ClassMethod EnableIPM(ByRef pCommandInfo)
                 write !, $$$FormatText("Would install IPM using file at %1 in namespace %2", filePath, currentNS)
                 continue
             }
-            $$$RedirectOutputToLog(1,set tSC = $system.OBJ.Load(##class(%File).NormalizeFilename(targetIPMFileName, XMLDir), loadFlag))
+            set tSC = $system.OBJ.Load(##class(%File).NormalizeFilename(targetIPMFileName, XMLDir), loadFlag)
             if $$$ISOK(tSC) {
                 set enabledNSList = enabledNSList_$listbuild(currentNS)
             } else {
