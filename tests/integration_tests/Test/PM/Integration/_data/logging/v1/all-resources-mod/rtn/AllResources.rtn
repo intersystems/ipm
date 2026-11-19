@@ -1,0 +1,7 @@
+ROUTINE AllResources
+#include AllResources
+
+MyFunction() PUBLIC
+{
+	quit $$$answer
+}

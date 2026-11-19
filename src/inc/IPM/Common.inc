@@ -52,6 +52,17 @@ ROUTINE %IPM.Common [Type=INC]
 #; Process-private state for the chained output-capture tee (see %IPM.General.LogManager)
 #define IPMLogCapture ^||%IPM.LogCapture
 
+#; Runs %statement with its output captured to the log, ending the capture even if %statement throws
+#define RedirectOutputToLog(%writeToTerminal,%statement) ##continue
+    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(%writeToTerminal) ##continue
+    try { ##continue
+        %statement ##continue
+    } catch redirectOutputToLogEx { ##continue
+        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog() ##continue
+        throw redirectOutputToLogEx ##continue
+    } ##continue
+    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+
 #; System method/special variable wrappers
 #define InProgrammerMode ##class(%SYSTEM.Process).IsProgrammerMode()
 
