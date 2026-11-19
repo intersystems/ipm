@@ -95,6 +95,17 @@ Method TestLoadCapturesCompileOutput()
     do $$$AssertTrue(..FileContains(txtLogFile, "BaseMod.Class1"), "Compiled class name is present in the txt log file")
 }
 
+/// Tests that pip output from installing a PythonWheel resource is written to the .txt log file
+Method TestLoadCapturesPipOutput()
+{
+    set moduleDir = ..GetModuleDir("python-deps-tests", "lune-wheel-no-reqs")
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load " _ moduleDir))
+
+    set files = ..GetLogFilesInDir(..DefaultLogFileDir)
+    set txtLogFile = $listget(files.%Get("txt"), 1)
+    do $$$AssertTrue(..FileContains(txtLogFile, "lune-1.6.2"), "pip output is present in the txt log file")
+}
+
 /// Tests that output from every resource type that produces IRIS output is written to the .txt log file
 Method TestLoadCapturesAllResourceTypes()
 {
