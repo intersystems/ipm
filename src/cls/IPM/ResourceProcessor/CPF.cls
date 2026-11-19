@@ -203,10 +203,8 @@ ClassMethod MergeCPF(
             set atEnd = ($zeof = -1)
             use io // Switch back to the caller's original device so logging doesn't go to the command pipe
             set line = $zstrip(line, "<>WC")
-            if (line '= "") {
-                set output = output _ $char(13, 10) _ line
-                $$$LogLine(line, $select($extract(line, 1, 5) = "ERROR": $$$Error, 1: $$$Info))
-            }
+            set output = output _ $char(13, 10) _ line
+            $$$LogLine(line, $select($extract(line, 1, 5) = "ERROR": $$$Error, 1: $$$Info))
             if atEnd {
                 quit
             }
