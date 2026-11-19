@@ -1,4 +1,4 @@
-Include %IPM.Formatting
+Include (%IPM.Common, %IPM.Formatting)
 
 Class %IPM.ResourceProcessor.PythonWheel Extends %IPM.ResourceProcessor.Abstract
 {
@@ -42,9 +42,7 @@ Method OnPhase(
             $$$ThrowStatus($$$ERROR($$$GeneralError, "Wheel file """_wheel_""" not found."))
         }
 
-        if verbose {
-            write !,"Installing wheel package """_wheel_"""..."
-        }
+        $$$LogLine("Installing wheel package """_wheel_"""...")
 
         set target = ##class(%File).NormalizeDirectory("python", ##class(%File).ManagerDirectory())
         set quiet = ($data(pParams("Verbose")) && (pParams("Verbose") = 0))
@@ -57,7 +55,7 @@ Method OnPhase(
             set errorText = ##class(%SYSTEM.Status).GetErrorText(ex.AsStatus())
             set errMsg = $$$FormatText("Skipping installation of python wheel '%1' due to error: '%2'. ", ..Name, errorText)
             set errMsg = errMsg _ "Please verify Python is correctly configured in IRIS. Otherwise you may need to install this wheel manually or from PyPI to use certain features of IPM."
-            write !, $$$FormattedLine($$$Red, errMsg)
+            $$$LogLine(errMsg, $$$Error, 1)
             return $$$OK
         }
         return ex.AsStatus()

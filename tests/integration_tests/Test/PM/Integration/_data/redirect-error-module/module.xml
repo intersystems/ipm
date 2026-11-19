@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="25">
+  <Document name="redirect-error-module.ZPM">
+    <Module>
+      <Name>redirect-error-module</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <Resource Name="RedirectErrorModule.Trigger.CLS"/>
+      <Invoke Class="RedirectErrorModule.Trigger" Method="RaiseWrappedError"/>
+    </Module>
+  </Document>
+</Export>

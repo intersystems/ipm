@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1135: `KeepOnUninstall` attribute on `FileCopy` resources leaves the copied files in place on `uninstall` and `clean`, for files other modules may share
 - #1232: `FileCopy`, `CSPApplication`, and `ArtifactoryTarball` resources warn when they copy into the instance's install directory, which can be read-only, for example via `{$cspDir}` or `{$libDir}`. Instances whose install directory is also their data directory do not warn.
 - #150: `generate` asks for a tests folder (default `tests`) and adds a `UnitTest` resource for the test classes in it
+- #1240: Add logging to .txt and .jsonl files for zpm `load`, `install`, `update`, and `uninstall` commands
 
 ### Fixed
 - #1023: `test` on a module with a `Scope="test"` class no longer fails in Compile with "Class does not exist". The class loads and compiles in the Test phase, as with `test -only`.
@@ -55,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1158: Searching for or installing modules with deployed code will automatically filter for the currently installed IRIS version
 - `ArtifactoryTarball` resources download without credentials from Artifactory servers that allow anonymous read access, using the artifact and property search APIs instead of AQL. Only `ARTI_SERVER` is required: `ARTI_PORT` defaults to 443 and `ARTI_AQL_URL` to `/artifactory/api/search/aql`.
 - Minimum supported Python version is now 3.9 (was previously 3.10)
+
+### Changed
+- Minimum supported Python version is now 3.9
 
 ### Fixed
 - #1260: ensure appropriate error reported if -env file does not exist.
