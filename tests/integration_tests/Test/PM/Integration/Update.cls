@@ -49,6 +49,29 @@ Method OnBeforeAllTests() As %Status
   return sc
 }
 
+/// Only classes named <UpdatePackage>.V<number> are update steps.
+/// Helper classes such as V3Helper or Validator and classes in subpackages are not.
+Method TestUpdateStepClassNames()
+{
+    set package = "UpdateStepNames.Upd"
+    for name = "V1", "V01", "V3", "V10", "V3Helper", "Validator", "Vsub.V2" {
+        $$$ThrowOnError(##class(%Dictionary.ClassDefinition).%New(package _ "." _ name).%Save())
+    }
+    $$$ThrowOnError($system.OBJ.CompilePackage(package, "ck-d"))
+
+    do ##class(%IPM.General.Update.VersionBase).GetUpdatePackageClassList(package, .list)
+    set found = ""
+    set number = ""
+    for {
+        set number = $order(list(number), 1, className)
+        quit:number=""
+        set found = found _ $listbuild(number _ "=" _ className)
+    }
+    do $$$AssertEquals($listtostring(found), "1="_package_".V1,3="_package_".V3,10="_package_".V10,01="_package_".V01")
+
+    $$$ThrowOnError($system.OBJ.DeletePackage(package, "-d"))
+}
+
 Method TestAllNoErrorModulesNoMirror()
 {
   if $system.Mirror.IsMember() {

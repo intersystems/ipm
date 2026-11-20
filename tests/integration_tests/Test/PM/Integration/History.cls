@@ -247,6 +247,165 @@ Method TestInvalidHistoryCommands()
     do $$$AssertStatusNotOK(sc,"Invalid command: "_command)
 }
 
+Method TestUnderscoreFilterColumn()
+{
+    for package = "underscore-a", "underscore-b" {
+        set log = ##class(%IPM.General.History).LoadInit(package)
+        do log.Finalize($$$OK)
+        kill log
+    }
+
+    set sc = ##class(%IPM.Main).Shell("history delete -DPackage=underscore-* -DVersion_Major=99")
+    do $$$AssertStatusOK(sc, "Delete with an unmatched Version_Major filter succeeded")
+    do $$$AssertEquals(..CountHistory(), 2, "A filter that matches nothing deletes nothing")
+
+    set filter("Package") = "underscore-a"
+    set filter("Version_Major") = 99
+    do $$$AssertEquals(..CountHistory(.filter), 0, "Version_Major applies together with Package")
+    set filter("Version_Major") = 0
+    do $$$AssertEquals(..CountHistory(.filter), 1, "Both filters match one record")
+
+    kill filter
+    set filter("Bad-Name") = "x"
+    try {
+        do ##class(%IPM.General.History).GetHistory(.filter)
+        do $$$AssertFailure("An invalid filter column was ignored")
+    } catch ex {
+        do $$$AssertTrue(ex.DisplayString() [ "Bad-Name", "An invalid filter column is refused: "_ex.DisplayString())
+    }
+}
+
+Method TestGlobalDeleteFilters()
+{
+    new $namespace
+    set originalNS = $namespace
+    set otherNS = ..CreateNewNamespace()
+    for ns = originalNS, otherNS {
+        set $namespace = ns
+        do ..SaveRecordStartedDaysAgo("global-filter-selected", 0)
+        do ..SaveRecordStartedDaysAgo("global-filter-neighbor", 0)
+    }
+    set $namespace = originalNS
+
+    set sc = ##class(%IPM.Main).Shell("history delete -globally -DPackage=global-filter-selected -DZ-Bad=x")
+    do $$$AssertStatusNotOK(sc, "An invalid filter is refused before any namespace is modified")
+    set filter("Package") = "global-filter-selected"
+    for ns = originalNS, otherNS {
+        set $namespace = ns
+        do $$$AssertEquals(..CountHistory(.filter), 1, "Invalid filter preserves the selected record in "_ns)
+    }
+    set $namespace = originalNS
+
+    set sc = ##class(%IPM.Main).Shell("history delete -globally -DPackage=global-filter-selected -DVersion_Major=99")
+    do $$$AssertStatusOK(sc)
+    for ns = originalNS, otherNS {
+        set $namespace = ns
+        do $$$AssertEquals(..CountHistory(.filter), 1, "Unmatched version preserves the selected record in "_ns)
+    }
+    set $namespace = originalNS
+
+    set sc = ##class(%IPM.Main).Shell("history delete -globally -DPackage=global-filter-selected -DVersion_Major=1")
+    do $$$AssertStatusOK(sc)
+    set neighbor("Package") = "global-filter-neighbor"
+    for ns = originalNS, otherNS {
+        set $namespace = ns
+        do $$$AssertEquals(..CountHistory(.filter), 0, "Matching version is deleted in "_ns)
+        do $$$AssertEquals(..CountHistory(.neighbor), 1, "Unrelated record remains in "_ns)
+        do ##class(%IPM.General.History).DeleteHistory(.neighbor)
+    }
+}
+
+/// The retention purge deletes records older than HistoryRetain days and keeps newer ones.
+Method TestRetentionPurge()
+{
+    set oldId = ..SaveRecordStartedDaysAgo("retention-old", 40)
+    set newId = ..SaveRecordStartedDaysAgo("retention-new", 5)
+    set retain = ##class(%IPM.Repo.UniversalSettings).GetHistoryRetain()
+    do $$$AssertStatusOK(##class(%IPM.Repo.UniversalSettings).SetValue("history_retain", 30))
+    do ..ClearLastPurge()
+
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("version"), "Purge ran at shell entry")
+    do $$$AssertNotTrue(##class(%IPM.General.History).%ExistsId(oldId), "A record older than 30 days is purged")
+    do $$$AssertTrue(##class(%IPM.General.History).%ExistsId(newId), "A record newer than 30 days is kept")
+    do $$$AssertEquals(##class(%IPM.General.History).GetHistoryLastPurge(), +$horolog)
+
+    set laterId = ..SaveRecordStartedDaysAgo("retention-same-day", 40)
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("version"))
+    do $$$AssertTrue(##class(%IPM.General.History).%ExistsId(laterId), "The purge does not repeat on the same day")
+
+    do ##class(%IPM.Repo.UniversalSettings).SetValue("history_retain", retain)
+}
+
+/// GlobalRecords returns each namespace's own records once.
+Method TestGlobalRecords()
+{
+    new $namespace
+    set originalNS = $namespace
+    set log = ##class(%IPM.General.History).LoadInit("global-records-here")
+    do log.Finalize($$$OK)
+    kill log
+    set otherNS = ..CreateNewNamespace()
+    set $namespace = otherNS
+    set log = ##class(%IPM.General.History).LoadInit("global-records-other")
+    do log.Finalize($$$OK)
+    kill log
+    set $namespace = originalNS
+
+    set (here, other) = 0
+    set rs = ##class(%ResultSet).%New("%IPM.General.History:GlobalRecords")
+    do $$$AssertStatusOK(rs.Execute(0, 0))
+    while rs.Next() {
+        do $$$AssertEquals($namespace, originalNS, "Fetching preserves the caller's namespace")
+        set here = here + (rs.Get("Package") = "global-records-here")
+        set other = other + (rs.Get("Package") = "global-records-other")
+    }
+    do $$$AssertEquals(here, 1, "This namespace's record is returned once")
+    do $$$AssertEquals(other, 1, "The other namespace's record is returned once")
+
+    set rs = ##class(%ResultSet).%New("%IPM.General.History:GlobalRecords")
+    do $$$AssertStatusOK(rs.Execute(1, 1))
+    do $$$AssertTrue(rs.Next(), "The limited query can fetch its first record")
+    do $$$AssertStatusOK(rs.Close(), "The reader can close without fetching every namespace's rows")
+    do $$$AssertEquals($namespace, originalNS, "Closing preserves the caller's namespace")
+
+    set $namespace = otherNS
+    do $$$AssertStatusOK(##class(%IPM.Main).Shell("history delete -confirm"))
+}
+
+ClassMethod CountHistory(ByRef filter) As %Integer
+{
+    set rs = ##class(%IPM.General.History).GetHistory(.filter)
+    set count = 0
+    while rs.%Next() {
+        set count = count + 1
+    }
+    return count
+}
+
+ClassMethod SaveRecordStartedDaysAgo(
+	package As %String,
+	days As %Integer) As %Integer
+{
+    set log = ##class(%IPM.General.History).%New()
+    set log.Action = "load"
+    set log.Package = package
+    set log.CommandString = "load " _ package
+    set log.Version = ##class(%IPM.General.SemanticVersion).FromString("1.0.0")
+    set log.TimeStart = $zdatetime(($horolog - days) _ ",0", 3)
+    set log.Finalized = 1
+    $$$ThrowOnError(log.%Save())
+    return log.%Id()
+}
+
+/// The purge runs at most once a day, so forget when it last ran.
+ClassMethod ClearLastPurge()
+{
+    set index = ##class(%IPM.Repo.UniversalSettings).#HistoryRetain
+    new $namespace
+    set $namespace = "%SYS"
+    kill ^IPM.settings(index, "lastPurge")
+}
+
 /// Tests that a malformed module, which fails before anything is written, is never logged as committed, with or without -dev.
 Method TestDevMode()
 {

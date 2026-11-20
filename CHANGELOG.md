@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #806: Web applications in a module.xml from `generate` now load instead of failing with "The following invalid attributes were found". A CSP application's source files are deployed with a `FileCopy` resource, and enabling JWT no longer fails with `<UNDEFINED>`.
 - #503: `generate` names each package resource after the deepest package its classes share, such as `MyApp.Local.PKG` instead of `MyApp.PKG`
 - `generate` stops with an error when the source folder does not exist, instead of writing a module.xml with no code resources
+- `history find` and `history delete` apply filters on columns with an underscore, such as `-DVersion_Major=1`, and reject malformed column names. Before, such a filter and every later one were ignored, so a filtered `history delete` could delete every record.
+- The daily history purge deletes records older than `HistoryRetain` days. Before, it deleted nothing.
+- The `%IPM.General.History:GlobalRecords` query returns each namespace's own records and can close before the caller reads every row.
+- `update` treats only classes named `<UpdatePackage>.V<number>` as update steps. Before, a class such as `V3Helper` replaced step `V3`, which then never ran, and a class such as `Validator` made every update of the module fail with `<SUBSCRIPT>`.
 
 ## [0.10.10] - 2026-10-14
 

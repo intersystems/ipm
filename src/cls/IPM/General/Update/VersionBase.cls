@@ -45,10 +45,13 @@ ClassMethod GetUpdatePackageClassList(
             throw ##class(%Exception.SQL).CreateFromSQLCODE(res.%SQLCODE,res.%Message)
         }
         while res.%Next() {
-            // Class name is of the form UpdatePackage.V#
             set className = res.Name
-            // This strips everything except numbers following the '.' in the class name so we can isolate the # of this update class itself
-            set classNum = $zstrip($piece(className, ".", *),"*E'N")
+            set stepClass = $piece(className, ".", *)
+            if ($length(className, ".") '= ($length(updatePackage, ".") + 1)) || '$match(stepClass, "V[0-9]+") {
+                continue
+            }
+            // Preserve distinct class names such as V1 and V01.
+            set classNum = $extract(stepClass, 2, *)
             set updatePackageClassList(classNum) = className
         }
     } catch (ex) {

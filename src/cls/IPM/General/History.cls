@@ -99,11 +99,17 @@ ClassMethod ConstructSQLWhere(
         set clause = " WHERE 1 = 1 "
         set col = ""
         for {
-            set col = $order(filter(col), 1, value)
-            if (col = "") || ($data(value) # 2 = 0) || ('$match(col, "^[a-zA-Z][a-zA-Z0-9]*$")) {
+            set col = $order(filter(col))
+            if (col = "") {
                 quit
             }
-            // col is safe from SQL injection because we ensured it's alphanumeric above
+            if ($data(filter(col)) # 2 = 0) {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "Filter on column '"_col_"' has no value."))
+            }
+            set value = filter(col)
+            if '$match(col, "^[a-zA-Z][a-zA-Z0-9_]*$") {
+                $$$ThrowStatus($$$ERROR($$$GeneralError, "Invalid filter column '"_col_"'. Use `history schema` to list the columns."))
+            }
             if $listfind($listbuild(">=", "<=", "<>"), $extract(value, 1, 2)) {
                 set clause = clause _ " AND " _ col _ $extract(value, 1, 2) _ "?"
                 set varargs($increment(varargs)) = $extract(value, 3, *)
@@ -150,10 +156,13 @@ ClassMethod GetHistory(
 /// Delete the history of installations, uninstalls, and loads in current namespace
 ClassMethod DeleteHistory(ByRef filter) As %Integer
 {
-    set query = "DELETE FROM %IPM_General.History "
     $$$ThrowOnError(..ConstructSQLWhere(.filter, .where, .varargs))
-    set query = query _ where
-    set rs = ##class(%SQL.Statement).%ExecDirect(, query, varargs...)
+    quit ..DeleteHistoryWhere(where, .varargs)
+}
+
+ClassMethod DeleteHistoryWhere(where As %String, ByRef varargs) As %Integer [ Private ]
+{
+    set rs = ##class(%SQL.Statement).%ExecDirect(, "DELETE FROM %IPM_General.History " _ where, varargs...)
     $$$ThrowSQLIfError(rs.%SQLCODE, rs.%Message)
     quit rs.%ROWCOUNT
 }
@@ -170,7 +179,8 @@ ClassMethod AutoPurgeOldHistory() As %Status
         quit sc
     }
     set cutoffDate = $system.SQL.Functions.DATEADD("d", -retainDays, +$horolog)
-    set filter("TimeStart") = "<='" _cutoffDate_"'"
+    // The value is passed as a query parameter, so it must not be quoted.
+    set filter("TimeStart") = "<=" _ cutoffDate
     try {
         set count = ..DeleteHistoryGlobally(.filter, 0)
         do ..SetHistoryLastPurge()
@@ -200,6 +210,7 @@ ClassMethod DeleteHistoryGlobally(
 	ByRef filter,
 	verbose As %Boolean = 0) As %Integer
 {
+    $$$ThrowOnError(..ConstructSQLWhere(.filter, .where, .varargs))
     set originalNS = $namespace
     new $namespace
     set $namespace = "%SYS"
@@ -212,7 +223,7 @@ ClassMethod DeleteHistoryGlobally(
         if ##class(%Dictionary.ClassDefinition).%Exists($listbuild("%IPM.General.History")) {
             // Use try/catch to handle permission errors in locked-down namespaces
             try {
-                set subcount = ..DeleteHistory(.filter)
+                set subcount = ..DeleteHistoryWhere(where, .varargs)
                 set count = count + subcount
                 if verbose {
                     write !, "Deleted " _ subcount _ " record(s) from " _ ns, !
@@ -255,11 +266,13 @@ ClassMethod GlobalRecordsFetch(
 	ByRef Row As %List,
 	ByRef AtEnd As %Integer = 0) As %Status [ Internal, PlaceAfter = GlobalRecordsExecute ]
 {
+    new $namespace
     try {
         while qHandle.Count() > 0 {
             // Always get the first namespace. Remove it from list once corresponding result set is exhausted.
             set ns = ""
             set rs = qHandle.GetNext(.ns)
+            set $namespace = ns
             $$$ThrowOnError(..RecordsFetch(rs, .Row, .AtEnd))
             if AtEnd {
                 // If rs is empty, there could still be more namespaces to process
@@ -282,10 +295,6 @@ ClassMethod GlobalRecordsFetch(
 
 ClassMethod GlobalRecordsClose(ByRef qHandle As %Binary) As %Status [ Internal, PlaceAfter = GlobalRecordsFetch ]
 {
-    // Should not happen, but just in case
-    if qHandle.Count() '= 0 {
-        $$$ThrowStatus($$$ERROR($$$GeneralError, "Namespace list not empty in GlobalRecordsFetch()!"))
-    }
     set qHandle = ""
     quit $$$OK
 }
