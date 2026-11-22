@@ -50,7 +50,11 @@ Parameter TestReportFormat = "TestReportFormat";
 
 Parameter ModuleRoot = "ModuleRoot";
 
-Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain,TestReportFormat,ModuleRoot";
+/// Path to the notary executable that verifies packages from ORAS repositories configured with -trust-server.
+/// When empty, notary is found on the PATH.
+Parameter NotaryExecutable = "NotaryExecutable";
+
+Parameter CONFIGURABLE = "trackingId,analytics,ColorScheme,TerminalPrompt,PublishTimeout,PipCaller,UseStandalonePip,SemVerPostRelease,DefaultLogEntryLimit,HistoryRetain,TestReportFormat,ModuleRoot,NotaryExecutable";
 
 /// Returns configArray, that includes all configurable settings
 ClassMethod GetAll(Output configArray) As %Status
@@ -93,6 +97,9 @@ ClassMethod ResetToDefault(key As %String) As %Status
     }
     if key = ..#TestReportFormat {
         // No factory default; empty string means "use legacy output"
+        set defaultValue = ""
+    } elseif key = ..#NotaryExecutable {
+        // Empty finds notary on the PATH. The stored default would be the first path ever set.
         set defaultValue = ""
     } elseif key = ..#ModuleRoot {
         // Computed directly rather than read from storage — older IPM versions did not seed this default node

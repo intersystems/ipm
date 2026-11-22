@@ -75,6 +75,7 @@ jobs:
           push: false
           load: true
           tags: zpm
+          target: content-trust-test
           build-args: BASE=${{ steps.image.outputs.name }}
       - name: Run temporary registry
         timeout-minutes: 15
@@ -109,6 +110,19 @@ jobs:
             $ORAS_IMAGE)
           sleep 5
           docker logs $ORAS
+      - name: Run Docker Content Trust server
+        timeout-minutes: 5
+        run: |
+          NOTARY=$(docker run --rm -d \
+            --network zpm \
+            --name notary \
+            --network-alias notary \
+            -v "$PWD/tests/notary/server-config.json":/etc/notary/server-config.json:ro \
+            -v "$PWD/tests/notary/certs":/etc/notary/certs:ro \
+            notary:server-0.7.0 \
+            -config=/etc/notary/server-config.json)
+          sleep 2
+          docker logs $NOTARY
       - name: Test and Verify
         timeout-minutes: 30
         run: |
@@ -116,6 +130,7 @@ jobs:
             -e TEST_REGISTRY=http://registry:52773/registry/ \
             -e TEST_REGISTRY_USER=admin \
             -e TEST_REGISTRY_PASSWORD=SYS \
+            -e IPM_REQUIRE_CONTENT_TRUST=1 \
             zpm ${{ steps.image.outputs.flags }})
           sleep 5; docker exec $CONTAINER /usr/irissys/dev/Cloud/ICM/waitReady.sh
           docker cp . $CONTAINER:/home/irisowner/zpm/

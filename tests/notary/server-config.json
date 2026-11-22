@@ -1,0 +1,16 @@
+{
+    "server": {
+        "http_addr": ":4443",
+        "tls_cert_file": "/etc/notary/certs/notary-server.crt",
+        "tls_key_file": "/etc/notary/certs/notary-server.key"
+    },
+    "trust_service": {
+        "type": "local"
+    },
+    "logging": {
+        "level": "info"
+    },
+    "storage": {
+        "backend": "memory"
+    }
+}
