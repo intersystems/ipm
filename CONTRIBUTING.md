@@ -57,11 +57,12 @@ git checkout <target-branch> # consult with other IPM developers on which branch
 git checkout -b <new-branch-name>
 docker compose up -d --build
 ```
-This will spin up 3 (or 4, if you're working on v0.10.x) containers, which are:
+The development services include:
 - `ipm-iris-1`, a container that has the repo-version IPM built in the USER namespace, where the management portal (52773) is published to the host OS at 52774. On the Docker network, this container has the hostname `iris`.
 - `ipm-registry-1`, a container with a zpm-registry pre-configured, where the username is `admin`, the password is `SYS`, and the management portal (52773) is published to the host OS at 52775. On the Docker network, this container has the hostname `registry`.
 - `ipm-sandbox-1`, a container with a vanilla IRIS instance, where the management portal (52773) is published to the host OS at 52776. On the Docker network, this container has the hostname `sandbox`.
 - `ipm-oras-1`, a container WITHOUT any IRIS instance. This container is based on [zot](https://github.com/project-zot/zot) and provides an OCI image registry, with port 5000 published to the host OS at 5001. On the Docker network, this container has the hostname `oras`.
+- `ipm-notary-1`, the HTTPS Docker Content Trust server used by signed ORAS tests. The Compose IRIS service uses the test image that trusts its fixture CA. See [Notary test setup](tests/notary/README.md).
 
 The **registry** container runs [zpm-registry](https://github.com/intersystems-community/zpm-registry), the InterSystems community-maintained package registry — this is the same software that powers [pm.community.intersystems.com](https://pm.community.intersystems.com). The **oras** container runs [zot](https://github.com/project-zot/zot), a lightweight open-source OCI registry. OCI registries are the industry-standard type used by tools like Artifactory; zot is included here for easy local testing.
 

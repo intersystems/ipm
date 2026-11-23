@@ -92,6 +92,21 @@ If you install IPM on an instance without the legacy 0.7.x version, IPM is only 
 3. You can load any module that resides in any of the defined repos into IRIS. E.g. here is the way to install webterminal:
 > zpm: USER> install webterminal
 
+### Signed ORAS packages
+
+A publisher can sign an OCI tag with Docker Content Trust after publishing the package. To verify packages fetched from that repository, configure its HTTPS trust server in the IPM shell.
+
+```text
+repo -o -name release -url https://registry.example.org -namespace packages -trust-server https://trust.example.org
+install release/my-module
+```
+
+IPM runs the Notary v1 CLI as the IRIS operating-system user. Install `notary` on its PATH or set `config set NotaryExecutable <path>`. The trust server must allow noninteractive reads. The IRIS user's Notary configuration can specify a private CA (`remote_server.root_ca`) and publisher root pins (`trust_pinning`). Certificate verification must be enabled. On first use, IPM pins the root presented by the authenticated server. Subsequent checks share those pins across namespaces on the same instance.
+
+IPM accepts tags signed in `targets/releases` or `targets`. It checks the signed manifest and package archive by size and digest before unpacking. A command uses the same signed target for dependency planning and download. If verification fails, the protected repository cannot supply that package.
+
+The policy applies per repository and per fetch. An unqualified install can select another enabled supplier, and IPM can reuse an already installed dependency. Registry catalog support still determines which packages an unnamed listing can discover. A named install can succeed when the registry omits the package from its root catalog.
+
 ## To uninstall a module:
 > USER> zpm
 >

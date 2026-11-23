@@ -19,6 +19,9 @@ Parameter MONIKERALIAS As STRING [ Abstract ];
 /// Override this in subclasses to provide more padding.
 Parameter MaxDisplayTabCount As INTEGER = 3;
 
+/// Whether this type of repository accepts -trust-server and checks signatures on that trust server.
+Parameter TRUSTSERVERSUPPORTED As BOOLEAN = 0;
+
 Index ServerDefinitionKey On Name [ Unique ];
 
 /// String "type" identifier used in lock files
@@ -163,6 +166,11 @@ ClassMethod Configure(
                 set tSC = $$$ERROR($$$GeneralError,$$$FormatText(tMessage,tName))
                 $$$ThrowStatus(tSC)
             }
+        }
+
+        // A repository type that does not check signatures would silently ignore the trust server
+        if $data(pModifiers("trust-server")) && '..#TRUSTSERVERSUPPORTED {
+            $$$ThrowStatus($$$ERROR($$$GeneralError, $$$FormatText("Repository '%1' cannot use -trust-server. Only ORAS repositories check signatures on a trust server.", tName)))
         }
 
         if '$isobject(tInstance) {
