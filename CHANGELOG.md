@@ -13,7 +13,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #1135: `KeepOnUninstall` attribute on `FileCopy` resources leaves the copied files in place on `uninstall` and `clean`, for files other modules may share
 - #1232: `FileCopy`, `CSPApplication`, and `ArtifactoryTarball` resources warn when they copy into the instance's install directory, which can be read-only, for example via `{$cspDir}` or `{$libDir}`. Instances whose install directory is also their data directory do not warn.
 - #150: `generate` asks for a tests folder (default `tests`) and adds a `UnitTest` resource for the test classes in it
-- #1335: Remove IRIS for Health 2025.3 community container from the CI checks
 
 ### Fixed
 - #1023: `test` on a module with a `Scope="test"` class no longer fails in Compile with "Class does not exist". The class loads and compiles in the Test phase, as with `test -only`.
