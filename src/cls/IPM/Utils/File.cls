@@ -156,8 +156,14 @@ ClassMethod CopyDir(
     set tSC = $$$OK
     set tBadSC = $$$ERROR($$$GeneralError,$$$FormatText("Error copying directory %1 to %2",pSource,pDest))
     try {
-        if ..DirectoriesOverlap(pSource, pDest) {
+        // Clearing a target that contains the source deletes the source. Without clearing, only
+        // copying into the source itself is unsafe.
+        if pDeleteFirst && ..DirectoriesOverlap(pSource, pDest) {
             set message = $$$FormatText("Source %1 and target %2 are the same directory or one contains the other", pSource, pDest)
+            $$$ThrowStatus($$$ERROR($$$GeneralError, message))
+        }
+        if 'pDeleteFirst && ..DirectoryContains(pSource, pDest) {
+            set message = $$$FormatText("Target %2 is the source %1 or inside it", pSource, pDest)
             $$$ThrowStatus($$$ERROR($$$GeneralError, message))
         }
         if $$$isUNIX {
@@ -191,25 +197,33 @@ ClassMethod CopyDir(
     quit tSC
 }
 
-/// Returns 1 if first and second are the same directory or one is inside the other. Embedded Python
-/// compares device and inode, so a symlink or bind mount that aliases the two is caught too. Without
-/// Python, or on a filesystem that reports inode 0, only the normalized paths are compared.
+/// Returns 1 if first and second are the same directory or one is inside the other.
 ClassMethod DirectoriesOverlap(
 	first As %String,
 	second As %String) As %Boolean
 {
+    return ..DirectoryContains(first, second) || ..DirectoryContains(second, first)
+}
+
+/// Returns 1 if inner is the directory outer or inside it. Embedded Python compares device and inode,
+/// so a symlink or bind mount that aliases the two is caught too. Without Python, or on a filesystem
+/// that reports inode 0, only the normalized paths are compared.
+ClassMethod DirectoryContains(
+	outer As %String,
+	inner As %String) As %Boolean
+{
     try {
-        return ..DirectoriesOverlapPython(first, second)
+        return ..DirectoryContainsPython(outer, inner)
     } catch {
-        set first = ##class(%File).NormalizeDirectory(first)
-        set second = ##class(%File).NormalizeDirectory(second)
-        return ($extract(first, 1, $length(second)) = second) || ($extract(second, 1, $length(first)) = first)
+        set outer = ..NormalizeForComparison(outer)
+        set inner = ..NormalizeForComparison(inner)
+        return $extract(inner, 1, $length(outer)) = outer
     }
 }
 
-ClassMethod DirectoriesOverlapPython(
-	first As %String,
-	second As %String) As %Boolean [ Language = python ]
+ClassMethod DirectoryContainsPython(
+	outer As %String,
+	inner As %String) As %Boolean [ Language = python ]
 {
     import os
 
@@ -221,19 +235,16 @@ ClassMethod DirectoriesOverlapPython(
             raise OSError("Filesystem does not report file IDs")
         return (statA.st_dev, statA.st_ino) == (statB.st_dev, statB.st_ino)
 
-    def contains(outer, inner):
-        if not os.path.isdir(outer):
+    if not os.path.isdir(outer):
+        return False
+    path = os.path.abspath(inner)
+    while True:
+        if os.path.exists(path) and same(outer, path):
+            return True
+        parent = os.path.dirname(path)
+        if parent == path:
             return False
-        path = os.path.abspath(inner)
-        while True:
-            if os.path.exists(path) and same(outer, path):
-                return True
-            parent = os.path.dirname(path)
-            if parent == path:
-                return False
-            path = parent
-
-    return contains(first, second) or contains(second, first)
+        path = parent
 }
 
 /// Runs <var>command</var>, a ROBOCOPY command $list, and throws if it fails. ROBOCOPY exits with

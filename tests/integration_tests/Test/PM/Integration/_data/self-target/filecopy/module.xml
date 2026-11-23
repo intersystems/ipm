@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="self-target-filecopy.ZPM">
+    <Module>
+      <Name>self-target-filecopy</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <FileCopy Name="web/" Target="{$mgrDir}self-target-filecopy/web/"/>
+    </Module>
+  </Document>
+</Export>

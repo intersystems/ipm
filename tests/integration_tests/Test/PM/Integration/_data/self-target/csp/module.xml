@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="self-target-csp.ZPM">
+    <Module>
+      <Name>self-target-csp</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <CSPApplication Name="/web/" Url="/self-target-csp" PasswordAuthEnabled="1"/>
+    </Module>
+  </Document>
+</Export>
