@@ -251,15 +251,66 @@ Method TestFromPythonExceptionDropsQuery()
 ClassMethod RaiseRegistryHttpError(url As %String = "http://reg/v2/auth-test/demo/tags/list") [ Language = python ]
 {
     import iris
+
+    raise iris.cls("Test.PM.Unit.Oras").NewRegistryHttpError(url, 403, "Forbidden", '{"errors":[{"message":"denied"}]}')
+}
+
+/// Returns a RegistryHttpError for a response with the given status, reason and body.
+ClassMethod NewRegistryHttpError(
+	url As %String,
+	status As %Integer,
+	reason As %String,
+	body As %String) As %SYS.Python [ Language = python ]
+{
+    import iris
     import requests
 
     response = requests.Response()
-    response.status_code = 403
-    response.reason = "Forbidden"
+    response.status_code = status
+    response.reason = reason
     response.url = url
-    response._content = b'{"errors":[{"message":"denied"}]}'
+    response._content = body.encode()
     response.request = requests.Request("GET", url).prepare()
-    raise iris.cls("%IPM.Repo.Oras.PackageService").OrasHelper().RegistryHttpError(response)
+    return iris.cls("%IPM.Repo.Oras.PackageService").OrasHelper().RegistryHttpError(response)
+}
+
+// ===== Version listing =====
+
+/// A version whose manifest the registry fails to return is skipped, and the package's other
+/// versions are still listed.
+Method TestUnreadableManifestSkipsOnlyThatVersion()
+{
+    set def = ##class(%IPM.Repo.Oras.Definition).%New()
+    set def.Name = "myrepo"
+    set def.URL = "registry.example.com"
+    set service = def.GetPackageService()
+    $$$ThrowOnError(##class(%IPM.General.SemanticVersionExpression).FromString("*", .expression))
+    set criteria = ##class(%IPM.Repo.SearchCriteria).%New()
+    set modules = ##class(%Library.ListOfObjects).%New()
+
+    do service.ListModulesFromTagString(expression, ..FakeClientWithUnreadableManifest("2.0.0"), criteria, "demo", .modules)
+
+    if $$$AssertEquals(modules.Count(), 1, "Only the readable version is listed") {
+        do $$$AssertEquals(modules.GetAt(1).VersionString, "1.0.0")
+    }
+}
+
+/// Returns a stand-in for BasicAwareRegistry with tags 1.0.0 and 2.0.0, whose get_manifest fails
+/// with a 500 for badTag.
+ClassMethod FakeClientWithUnreadableManifest(badTag As %String) As %SYS.Python [ Language = python ]
+{
+    import iris
+
+    class FakeClient:
+        def call(self, operation, target, **kwargs):
+            if operation == "get_tags":
+                return ["1.0.0", "2.0.0"]
+            if target.endswith(":" + badTag):
+                url = "https://registry.example.com/v2/demo/manifests/" + badTag
+                raise iris.cls("Test.PM.Unit.Oras").NewRegistryHttpError(url, 500, "Internal Server Error", "")
+            return {"annotations": {"org.opencontainers.image.title": "demo"}}
+
+    return FakeClient()
 }
 
 // ===== Registry message extraction =====

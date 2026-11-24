@@ -1,0 +1,4 @@
+Class DepModule.Core
+{
+
+}

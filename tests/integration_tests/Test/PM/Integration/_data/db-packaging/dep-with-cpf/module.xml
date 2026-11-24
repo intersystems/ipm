@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+  <Document name="dep-with-cpf.ZPM">
+    <Module>
+      <Name>dep-with-cpf</Name>
+      <Version>1.0.0</Version>
+      <Packaging>module</Packaging>
+      <SourcesRoot>src</SourcesRoot>
+      <CPF Name="dep-with-cpf.cpf" />
+      <Resource Name="DepWithCPF.Main.CLS" />
+    </Module>
+  </Document>
+</Export>
