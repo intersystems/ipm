@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+    <Document name="cpf-merge-invalid.ZPM">
+        <Module>
+            <Name>cpf-merge-invalid</Name>
+            <Version>0.0.1</Version>
+            <Packaging>module</Packaging>
+            <SourcesRoot>src</SourcesRoot>
+
+            <!-- Invalid section name, so the merge before Initialize fails the load -->
+            <CPF Name="invalid-section.cpf" />
+        </Module>
+    </Document>
+</Export>
