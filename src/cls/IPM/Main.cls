@@ -1153,6 +1153,9 @@ ClassMethod ShellInternal(
                 do ..Sync(.tCommandInfo)
             }
         } catch pException {
+            // A failing IRIS system call or Ctrl+C may leave the chained capture tee installed;
+            // tear it down before displaying so the error line is not re-captured.
+            do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
             if (pException.Code = $$$ERCTRLC) {
                 set pException = $$$NULLOREF
                 do ##class(%IPM.General.LogManager).%Get().Finalize()
@@ -1160,6 +1163,8 @@ ClassMethod ShellInternal(
             }
             do ..DisplayError(pException.AsStatus())
         }
+        // Backstop for a command that returned with a scope still open.
+        do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
         do ##class(%IPM.General.LogManager).%Get().Finalize()
 
         // Check if IPM has uninstalled itself - exit gracefully if so
@@ -3373,7 +3378,7 @@ ClassMethod Import(ByRef pCommandInfo)
                     if 'tQuiet {
                         write !,"Loading "_tSourceDir
                     }
-                    set tSC = $system.OBJ.ImportDir(tSourceDir,,tLoadFlags,,tRecurse,.tImportedArray,tListOnly)
+                    $$$RedirectOutputToLog(tVerbose,set tSC = $system.OBJ.ImportDir(tSourceDir,,tLoadFlags,,tRecurse,.tImportedArray,tListOnly))
 
                     // Build $ListBuild list of loaded items
                     set tLoadedKey = ""
@@ -3387,9 +3392,9 @@ ClassMethod Import(ByRef pCommandInfo)
                     }
                 } else {
                     if 'tQuiet {
-                        write !,"Loading "_tSourceFile
+                        $$$LogLine("Loading "_tSourceFile, )
                     }
-                    set tSC = $system.OBJ.Load(tSourceFile,tLoadFlags,,.tLoadedList,tListOnly)
+                    $$$RedirectOutputToLog(tVerbose,set tSC = $system.OBJ.Load(tSourceFile,tLoadFlags,,.tLoadedList,tListOnly))
                     set tLoadedList = $listfromstring(tLoadedList)
                 }
             } else {

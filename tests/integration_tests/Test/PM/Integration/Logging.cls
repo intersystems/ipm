@@ -84,6 +84,41 @@ Method TestLoad()
     do ..GenericLoggingTest(commands, ..DefaultLogFileDir)
 }
 
+/// Tests that compiler output from a verbose 'load' is written to the .txt log file
+Method TestLoadCapturesCompileOutput()
+{
+    set moduleDir = ..GetModuleDir("logging", "v1", "base-mod")
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ moduleDir))
+
+    set files = ..GetLogFilesInDir(..DefaultLogFileDir)
+    set txtLogFile = $listget(files.%Get("txt"), 1)
+    do $$$AssertTrue(..FileContains(txtLogFile, "BaseMod.Class1"), "Compiled class name is present in the txt log file")
+}
+
+/// Tests that output from every resource type that produces IRIS output is written to the .txt log file
+Method TestLoadCapturesAllResourceTypes()
+{
+    set moduleDir = ..GetModuleDir("logging", "v1", "all-resources-mod")
+    $$$ThrowOnError(##class(%IPM.Main).Shell("load -v " _ moduleDir))
+
+    set files = ..GetLogFilesInDir(..DefaultLogFileDir)
+    set txtLogFile = $listget(files.%Get("txt"), 1)
+
+    set expected = $listbuild(
+        $listbuild("AllResources.SingleClass", "CLS resource"),
+        $listbuild("AllResources.Pkg.PackagedClass", "PKG resource"),
+        $listbuild("AllResources.inc", "INC resource"),
+        $listbuild("AllResources.rtn", "MAC resource"),
+        $listbuild("Imported global: ^AllResources", "GBL resource"),
+        $listbuild("AllResources.Messages.LOC", "LOC resource")
+    )
+    set ptr = 0
+    while $listnext(expected, ptr, item) {
+        set $listbuild(text, description) = item
+        do $$$AssertTrue(..FileContains(txtLogFile, text), "Output of " _ description _ " is present in the txt log file")
+    }
+}
+
 /// Tests creation of a log file on the 'update' command
 Method TestUpdate()
 {

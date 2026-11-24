@@ -1,0 +1,4 @@
+Class AllResources.Pkg.PackagedClass
+{
+
+}

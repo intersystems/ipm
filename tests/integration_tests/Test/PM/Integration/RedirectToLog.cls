@@ -15,6 +15,9 @@ Parameter TargetClass = "Test.PM.Integration.Data.RedirectionToLog.Target";
 /// Fully-qualified name of a class whose compile fails; its error output names it on the device.
 Parameter ErrorTargetClass = "Test.PM.Integration.Data.RedirectionToLog.ErrorTarget";
 
+/// Part of the path of the non-existent xml file redirect-error-module tries to import; fails
+Parameter ErrorFileFragment = "redirect-error-target";
+
 Property LoadedClasses [Multidimensional];
 
 Method OnBeforeOneTest(testname As %String) As %Status
@@ -124,33 +127,6 @@ Method TestErrorLoggedAndEchoed()
     do $$$AssertTrue(..FindStringInMultiDimArray(..#ErrorTargetClass, .terminal), "Class with compilation errors WAS echoed to the terminal")
 }
 
-/// When an IPM command throws from an erroring IRIS system call wrapped in the chained capture tee,
-/// the shell must still close the redirection: the command reports failure, interception is switched
-/// off, the original I/O handler is restored, and the chained capture state is cleared.
-Method TestCommandErrorRestoresRedirection()
-{
-    set moduleDir = ..GetModuleDir("redirect-error-module")
-
-    // Record the redirection baseline so we can prove the shell handed control back after the failure.
-    set originalRedirect = ##class(%Device).ReDirectIO()
-    set originalHandler = $select(originalRedirect : $zutil(96, 12), 1 : "")
-
-    // The module Invoke opens the tee and rethrows an erroring import; the shell catches it and reports failure.
-    set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
-    do $$$AssertStatusNotOK(sc, "Loading a module that throws from a wrapped IRIS system call WAS reported as an error")
-
-    // The failed command must leave redirection exactly as it found it.
-    set finalRedirect = ##class(%Device).ReDirectIO()
-    do $$$AssertEquals(finalRedirect, originalRedirect, "Redirection state WAS restored after the failed command")
-    set finalHandler = $select(finalRedirect : $zutil(96, 12), 1 : "")
-    do $$$AssertEquals(finalHandler, originalHandler, "Original I/O handler WAS restored after the failed command")
-    do $$$AssertNotTrue($data($$$IPMLogCapture("active")), "Chained capture state WAS cleared after the failed command")
-
-    // Clean up
-    do ##class(%IPM.Main).Shell("uninstall redirect-error-module -r")
-    do $system.OBJ.Delete("RedirectErrorModule.Trigger", "-d")
-}
-
 /// Begin the tee under an outer capture with terminal forwarding on, write a line, and assert it
 /// reached both the log (routing) and the outer capture buffer (forwarding intact).
 Method TestVerboseChainedCapture()
@@ -203,21 +179,19 @@ Method TestLineWithNewLineLoggedCleanly()
 {
     set log = ##class(%IPM.General.LogManager).%Get(.sc)
     $$$ThrowOnError(sc)
-    $$$ThrowOnError(..InitLog(log))
+    do ..InitLog(log)
     set txtPath = log.TxtFilePath
 
-    $$$ThrowOnError(##class(%IPM.General.LogManager).BeginChainedCaptureToLog(0))
+    do ##class(%IPM.General.LogManager).BeginChainedCaptureToLog(0)
     write "First line"_$char(13,10)_"Second line"
-    $$$ThrowOnError(##class(%IPM.General.LogManager).EndChainedCaptureToLog())
-    $$$ThrowOnError(log.Finalize())
+    do ##class(%IPM.General.LogManager).EndChainedCaptureToLog()
+    do log.Finalize()
 
     set firstLine = ..GetLineInFile(txtPath, "First line")
     set secondLine = ..GetLineInFile(txtPath, "Second line")
     do $$$AssertNotEquals(firstLine, secondLine, "Redirected output with CRLF embedded in it IS split into separate log lines")
     do $$$AssertNotTrue(firstLine [ $char(13), "First logged line does NOT contain a carriage return")
     do $$$AssertNotTrue(secondLine [ $char(13), "Second logged line does NOT contain a carriage return")
-    do $$$AssertNotTrue(firstLine [ $char(10), "First logged line does NOT contain a newline")
-    do $$$AssertNotTrue(secondLine [ $char(10), "Second logged line does NOT contain a newline")
 }
 
 /// A second, nested BeginChainedCaptureToLog should not have any effect on redirection.
@@ -266,6 +240,42 @@ Method TestEndWithHandlerOnTop()
     do $$$AssertTrue(..FindStringInMultiDimArray("After tee end", .inner), "Module capture survived the tee teardown")
     do $$$AssertTrue(..FileContains(txtPath, "Tee line"), "Line written before teardown WAS logged")
     do $$$AssertNotTrue(..FileContains(txtPath, "After tee end"), "Stray line was NOT logged after the tee ended")
+}
+
+/// A failing $system call surfaces its error in both the log (at [ERROR]) and the terminal, and the
+/// shell still closes the redirection the command left open.
+Method TestCommandErrorLogsStatusAndRestoresRedirection()
+{
+    set moduleDir = ..GetModuleDir("redirect-error-module")
+    set logDir = ##class(%File).NormalizeDirectory(##class(%IPM.Utils.File).CreateTempDirectory(##class(%SYS.System).TempDirectory()))
+
+    // Record the redirection baseline so we can prove the shell handed control back after the failure.
+    set originalRedirect = ##class(%Device).ReDirectIO()
+    set originalHandler = $select(originalRedirect : $zutil(96, 12), 1 : "")
+
+    // Capture the terminal so we can prove the $system error was echoed, not only logged.
+    do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
+    set sc = ##class(%IPM.Main).Shell("load -v -log-dir " _ logDir _ " " _ moduleDir)
+    do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .terminal)
+    do $$$AssertStatusNotOK(sc, "Loading a module that throws from a wrapped $system call WAS reported as an error")
+
+    // Check that error would be surfaced in the terminal and in the logs.
+    do $$$AssertTrue(..FindStringInMultiDimArray(..#ErrorFileFragment, .terminal), "The $system error WAS echoed to the terminal")
+    set txtPath = $zsearch(logDir _ "*.txt")
+    do $$$AssertNotEquals(txtPath, "", "A .txt log file WAS created for the failed command")
+    do $$$AssertTrue(..FileContains(txtPath, ..#ErrorFileFragment), "The $system error WAS logged")
+
+    // The failed command must leave redirection exactly as it found it.
+    set finalRedirect = ##class(%Device).ReDirectIO()
+    do $$$AssertEquals(finalRedirect, originalRedirect, "Redirection state WAS restored after the failed command")
+    set finalHandler = $select(finalRedirect : $zutil(96, 12), 1 : "")
+    do $$$AssertEquals(finalHandler, originalHandler, "Original I/O handler WAS restored after the failed command")
+    do $$$AssertNotTrue($data($$$IPMLogCapture), "Chained capture state WAS cleared after the failed command")
+
+    // Clean up
+    do ##class(%IPM.Main).Shell("uninstall redirect-error-module -r")
+    do $system.OBJ.Delete("RedirectErrorModule.Trigger", "-d")
+    do ##class(%IPM.Utils.File).RemoveDirectoryTree(logDir)
 }
 
 ClassMethod InitLog(

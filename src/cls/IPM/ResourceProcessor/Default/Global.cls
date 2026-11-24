@@ -66,7 +66,7 @@ Method OnPhase(
                 }
 
                 if '..ResourceReference.Preload {
-                    set tSC = $system.OBJ.Load(resourcePath, $select(tVerbose:"/display", 1:"/nodisplay") _ "/nocompile")
+                    $$$RedirectOutputToLog(1,set tSC = $system.OBJ.Load(resourcePath, $select(tVerbose:"/display", 1:"/nodisplay") _ "/nocompile"))
                     if $$$ISERR(tSC) {
                         quit
                     }

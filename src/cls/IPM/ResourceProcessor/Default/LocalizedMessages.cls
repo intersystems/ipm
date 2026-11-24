@@ -28,7 +28,7 @@ Method OnBeforePhase(
     }
     if (pPhase = "Compile") {
         // Uses CompileList rather than Compile to support custom document type (.LOC)
-        set tSC = $system.OBJ.CompileList(..ResourceReference.Name,$select(tVerbose:"d",1:"-d")_..Flags)
+        $$$RedirectOutputToLog(1,set tSC = $system.OBJ.CompileList(..ResourceReference.Name,$select(tVerbose:"d",1:"-d")_..Flags))
     }
     quit $$$ADDSC(tSC,##class(%IPM.ResourceProcessor.LocalizationExport)$this.OnBeforePhase(pPhase,.pParams))
 }

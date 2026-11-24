@@ -1,4 +1,4 @@
-Include %IPM.Formatting
+Include (%IPM.Common, %IPM.Formatting)
 
 Class %IPM.Utils.LegacyCompat
 {
@@ -40,7 +40,8 @@ ClassMethod UpdateSuperclassAndCompile(
         set qSpec = qSpec _ "/multicompile=0"
     }
 
-    quit $system.OBJ.CompileList(.pItems, .qSpec)
+    $$$RedirectOutputToLog(1,set tSC = $system.OBJ.CompileList(.pItems, .qSpec))
+    quit tSC
 }
 
 }

@@ -194,7 +194,7 @@ Method AddCacheItem(
     set pVersionString = ""
     try {
         // Get list of what's in module.xml
-        set tSC = $system.OBJ.Load(pModuleFileName,"-d",,.tLoadedList,1)
+        $$$RedirectOutputToLog(1,set tSC = $system.OBJ.Load(pModuleFileName,"-d",,.tLoadedList,1))
         if $$$ISERR(tSC) {
             // Wasn't a valid file. We'll just continue.
             set tSC = $$$OK

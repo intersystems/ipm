@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="IRIS" version="26">
+    <Document name="all-resources-mod.ZPM">
+        <Module>
+            <Name>all-resources-mod</Name>
+            <Version>1.0.0</Version>
+            <Packaging>module</Packaging>
+            <CPF Name="config-globals.cpf" />
+            <Resource Name="AllResources.SingleClass.CLS" />
+            <Resource Name="AllResources.Pkg.PKG" />
+            <Resource Name="AllResources.INC" />
+            <Resource Name="AllResources.MAC" />
+            <Resource Name="AllResources.GBL" />
+            <Resource Name="AllResources.Msgs.LOC" />
+        </Module>
+    </Document>
+</Export>
