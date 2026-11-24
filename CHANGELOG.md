@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - Unreleased
+
+### Changed
+- #1104: Loading a module from source now fails when a resource's file holds a different name, such as `MyFile.HL7` containing `<Document name="My-File.HL7">`. Document types such as LUT, HL7 and DFI used to load under the other name and package an empty file.
+
 ## [0.10.11] - Unreleased
 
 ### Added

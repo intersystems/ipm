@@ -365,6 +365,7 @@ Method OnLoad(
             set tSC = $$Import^%apiRTN(pFullResourcePath,"replace,compile="_pCompile,,,.tResult,$select(pVerbose:"d",1:"-d"))
         } else {
             set tProcessed = 0
+            set savedUnderResourceName = 0
             set fileExt = $$$UPPER($piece(pFullResourcePath, ".", *))
             if '$listfind($listbuild("CLS", "MAC"), fileExt), ##class(%RoutineMgr).UserType(..ResourceReference.Name, .docclass, .doctype) {
                 try {
@@ -388,6 +389,7 @@ Method OnLoad(
                             $$$ThrowOnError(routineMgr.%Save())
                             write:tVerbose !,"Imported document: ", ..ResourceReference.Name, !, "Load finished successfully.", !
                             set tProcessed = 1
+                            set savedUnderResourceName = 1
                         } catch ex { }
                     }
                 } catch ex {
@@ -396,7 +398,11 @@ Method OnLoad(
             }
             if 'tProcessed {
                 set tSC = $system.OBJ.Load(pFullResourcePath,tFlags,,.pLoadedList)
-                $$$ThrowOnError(tSC)
+            }
+            // Checked here because the catch blocks above swallow errors
+            $$$ThrowOnError(tSC)
+            if 'savedUnderResourceName && (..ResourceReference.Name '[ "*") {
+                do ..AssertResourceLoaded(pFullResourcePath, pLoadedList)
             }
         }
         $$$ThrowOnError(..OnLoadDeployed(.pParams, .pLoadedList))
@@ -419,6 +425,26 @@ Method OnLoad(
         set tSC = e.AsStatus()
     }
     quit tSC
+}
+
+/// Throws unless the resource exists after loading fullResourcePath. Load imports the name inside the
+/// file but export writes the resource name, so a mismatch would package an empty or missing item.
+/// loadedList is the comma-separated names $system.OBJ.Load reported.
+Method AssertResourceLoaded(
+	fullResourcePath As %String,
+	loadedList As %String)
+{
+    // Exists applies IRIS naming rules, so X.BPL finds class X and Test.CLS finds User.Test
+    if ##class(%RoutineMgr).Exists(..ResourceReference.Name) {
+        return
+    }
+    // A document type may not implement Exists. Match whole entries, since names may contain commas.
+    if ("," _ $zconvert(loadedList, "U") _ ",") [ ("," _ $zconvert(..ResourceReference.Name, "U") _ ",") {
+        return
+    }
+    set contents = $select(loadedList = "": "nothing", 1: loadedList)
+    set msg = "Resource " _ ..ResourceReference.Name _ " was loaded from " _ fullResourcePath _ ", which contains " _ contents _ ". Rename the file or the item inside it so the names match."
+    $$$ThrowStatus($$$ERROR($$$GeneralError, msg))
 }
 
 Method OnLoadDeployed(
