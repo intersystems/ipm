@@ -15,6 +15,13 @@ Property ClientNSCreated As %Boolean [ InitialExpression = 0 ];
 
 Property RegistryAdded As %Boolean [ InitialExpression = 0 ];
 
+/// Runs an IPM shell command, retrying once on a namespace activation failure.
+/// Use it for commands that merge CPF files or change mappings. See <class>%IPM.Test.Utils</class>:<method>CallWithQuiesceRetry</method>.
+ClassMethod Shell(command As %String) As %Status
+{
+	return ##class(%IPM.Test.Utils).CallWithQuiesceRetry("%IPM.Main", "Shell", command)
+}
+
 Method Setup() As %Status
 {
 	set tSC = $$$OK

@@ -7,7 +7,7 @@ Parameter TargetModuleName As STRING = "cpf-merge";
 /// Test that unmapping from a single namespace still works correctly after batch activation change
 Method TestBatchActivationUnmapSingleNamespace()
 {
-    set sc = ##class(%IPM.Main).Shell("load -v " _ ..GetModuleDir(..#TargetModuleName))
+    set sc = ..Shell("load -v " _ ..GetModuleDir(..#TargetModuleName))
     do $$$AssertStatusOK(sc, "Loaded cpf-merge module successfully")
 
     set ns = "TEST_UNMAP_NS"
@@ -17,7 +17,7 @@ Method TestBatchActivationUnmapSingleNamespace()
     do $$$AssertStatusOK(sc, "Created test namespace")
 
     // Add a test package mapping
-    set sc = ##class(%IPM.Utils.Module).AddPackageMapping(ns, "TestPackage", "USER")
+    set sc = ##class(%IPM.Test.Utils).CallWithQuiesceRetry("%IPM.Utils.Module", "AddPackageMapping", ns, "TestPackage", "USER")
     do $$$AssertStatusOK(sc, "Added test package mapping")
 
     // Verify mapping exists before unmap
@@ -29,7 +29,7 @@ Method TestBatchActivationUnmapSingleNamespace()
 
     // Test unmap via CLI (uses batch activation internally)
     set $namespace = originalNs
-    set sc = ##class(%IPM.Main).Shell("unmap -ns " _ ns _ " -q")
+    set sc = ..Shell("unmap -ns " _ ns _ " -q")
     do $$$AssertStatusOK(sc, "Unmap command executed successfully")
 
     // Verify mappings are removed
@@ -49,7 +49,7 @@ Method TestBatchActivationUnmapSingleNamespace()
 /// Test batch activation when unmapping from multiple namespaces
 Method TestBatchActivationUnmapMultipleNamespaces()
 {
-    set sc = ##class(%IPM.Main).Shell("load -v " _ ..GetModuleDir(..#TargetModuleName))
+    set sc = ..Shell("load -v " _ ..GetModuleDir(..#TargetModuleName))
     do $$$AssertStatusOK(sc, "Loaded cpf-merge module successfully")
 
     // Create multiple test namespaces
@@ -64,7 +64,7 @@ Method TestBatchActivationUnmapMultipleNamespaces()
         do $$$AssertStatusOK(sc, "Created namespace: " _ ns)
 
         // Add test mappings to each namespace
-        set sc = ##class(%IPM.Utils.Module).AddPackageMapping(ns, "TestPackage", "USER")
+        set sc = ##class(%IPM.Test.Utils).CallWithQuiesceRetry("%IPM.Utils.Module", "AddPackageMapping", ns, "TestPackage", "USER")
         do $$$AssertStatusOK(sc, "Added package mapping to " _ ns)
     }
 
@@ -80,7 +80,7 @@ Method TestBatchActivationUnmapMultipleNamespaces()
 
     // Unmap from all namespaces at once (uses batch activation)
     set $namespace = originalNs
-    set sc = ##class(%IPM.Main).Shell("unmap -ns " _ $listtostring(namespaces, ",") _ " -q")
+    set sc = ..Shell("unmap -ns " _ $listtostring(namespaces, ",") _ " -q")
     do $$$AssertStatusOK(sc, "Unmap from multiple namespaces executed successfully")
 
     // Verify all mappings are removed
@@ -103,7 +103,7 @@ Method TestBatchActivationUnmapMultipleNamespaces()
 /// Test that activation is skipped when there are no actual changes
 Method TestBatchActivationSkipsWhenNoChanges()
 {
-    set sc = ##class(%IPM.Main).Shell("load -v " _ ..GetModuleDir(..#TargetModuleName))
+    set sc = ..Shell("load -v " _ ..GetModuleDir(..#TargetModuleName))
     do $$$AssertStatusOK(sc, "Loaded cpf-merge module successfully")
 
     set ns = "TEST_NO_CHANGE_NS"
@@ -111,18 +111,18 @@ Method TestBatchActivationSkipsWhenNoChanges()
     do $$$AssertStatusOK(sc, "Created test namespace")
 
     // First, add a test mapping so we have something to unmap
-    set sc = ##class(%IPM.Utils.Module).AddPackageMapping(ns, "TestPackage", "USER")
+    set sc = ##class(%IPM.Test.Utils).CallWithQuiesceRetry("%IPM.Utils.Module", "AddPackageMapping", ns, "TestPackage", "USER")
     do $$$AssertStatusOK(sc, "Added test package mapping")
 
     // Unmap from the namespace (this will activate)
-    set sc = ##class(%IPM.Main).Shell("unmap -ns " _ ns _ " -q")
+    set sc = ..Shell("unmap -ns " _ ns _ " -q")
     do $$$AssertStatusOK(sc, "First unmap executed successfully")
 
     set cookie = ""
     do ##class(%IPM.Utils.Module).BeginCaptureOutput(.cookie)
     // Try to unmap again from the same namespace
     // Since there are no more IPM mappings, this should skip
-    set sc = ##class(%IPM.Main).Shell("unmap -ns " _ ns)
+    set sc = ..Shell("unmap -ns " _ ns)
     do ##class(%IPM.Utils.Module).EndCaptureOutput(cookie, .output)
 
     // Should report "No mapping found" and skip (no activation)
@@ -143,7 +143,7 @@ Method TestEnableMapSingleNamespace()
     do $$$AssertStatusOK(sc, "Created target namespace")
 
     // Map IPM from current namespace into target namespace (quiet mode)
-    set sc = ##class(%IPM.Main).Shell("enable -map -ns " _ targetNs _ " -q")
+    set sc = ..Shell("enable -map -ns " _ targetNs _ " -q")
     do $$$AssertStatusOK(sc, "enable -map executed successfully")
 
     // Verify mappings were created
@@ -162,7 +162,7 @@ Method TestEnableMapSingleNamespace()
 /// Verify enable -map -repos batches activation across multiple namespaces
 Method TestEnableMapMultipleNamespacesWithRepos()
 {
-    set sc = ##class(%IPM.Main).Shell("load -v " _ ..GetModuleDir(..#TargetModuleName))
+    set sc = ..Shell("load -v " _ ..GetModuleDir(..#TargetModuleName))
     do $$$AssertStatusOK(sc, "Loaded cpf-merge module successfully")
 
     set ns1 = "TEST_ENABLE_MAP_NS2"
@@ -175,7 +175,7 @@ Method TestEnableMapMultipleNamespacesWithRepos()
     do $$$AssertStatusOK(sc, "Created namespace " _ ns2)
 
     // Map IPM and repos from current namespace into both targets
-    set sc = ##class(%IPM.Main).Shell("enable -map -repos -ns " _ ns1 _ "," _ ns2 _ " -q")
+    set sc = ..Shell("enable -map -repos -ns " _ ns1 _ "," _ ns2 _ " -q")
     do $$$AssertStatusOK(sc, "enable -map -repos executed successfully")
 
     // Verify package/routine and repo globals mapped
