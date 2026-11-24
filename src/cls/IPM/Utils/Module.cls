@@ -83,7 +83,6 @@ ClassMethod LoadModuleReference(
         #dim manager As %IPM.Repo.Manager
         set manager = ##class(%IPM.Repo.Manager).%Get(.tSC)
         $$$ThrowOnError(tSC)
-
         set tClient = manager.CheckServiceCache(pServerName,.tAvailable)
         if 'tAvailable {
             set tSC = $$$ERROR($$$GeneralError,$$$FormatText("Repository '%1' is unavailable.",pServerName))
@@ -141,13 +140,12 @@ ClassMethod LoadModuleReference(
         } else {
             set tAsArchive = -1
             set tPayload = tClient.GetModule(tModRef, .tAsArchive)
-            if (tVerbose) {
-                set serverDef = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pServerName)
-                write !,"Module "_pModuleName_" was downloaded from " _ pServerName
-                if $isobject(serverDef) {
-                    write " (",serverDef.Details,")"
-                }
+            set serverDef = ##class(%IPM.Repo.Definition).ServerDefinitionKeyOpen(pServerName)
+            set line = "Module "_pModuleName_" was downloaded from " _ pServerName
+            if $isobject(serverDef) {
+                set line = line_" ("_serverDef.Details_")"
             }
+            $$$LogLine(line)
             set tFileName = ""
             if ($isobject(tPayload)) && (tPayload.%IsA("%Stream.FileBinary") ) {
                 set tFileName = tPayload.Filename
@@ -220,8 +218,6 @@ ClassMethod LoadModuleFromArchive(
 {
     set tSC = $$$OK
     try {
-        set tVerbose = $get(pParams("Verbose"))
-
         set moduleRoot = ##class(%IPM.Repo.UniversalSettings).GetModuleRoot()
         // Custom roots are always pre-created by EnsureWritableDirectory at config time, so the fallback
         // only triggers for the default ipm/ path before first use — one level up reaches DataDirectory(), which always exists.
@@ -250,7 +246,7 @@ ClassMethod LoadModuleFromArchive(
             quit
         }
         for i=1:1:$get(tOutput) {
-            write:tVerbose !,tOutput(i)
+            $$$LogLine(tOutput(i))
         }
 
         set dotModules = ##class(%File).NormalizeDirectory(".modules", tTargetDirectory)
@@ -301,7 +297,8 @@ ClassMethod LoadModuleFromDirectory(
     try {
         set tVerbose = $get(pParams("Verbose"))
         // LoadNewModule goes all the way through Reload->Validate->Compile->Activate, also compiling the new module.
-        write:tVerbose !,"Loading from ",pDirectory,!
+        set line = "Loading from "_pDirectory
+        $$$LogLine(line)
 
         // Propagate all params to dependencies except those that should only apply to the top level module
         // pParams("Install") indicates this is a top-level module
@@ -750,9 +747,7 @@ ClassMethod UninstallAll(
                 quit
             }
             if '$data(simpleModList(module)) {
-                if $get(pParams("Verbose")) {
-                    write !,"WARNING: module ",module," is missing, skipping uninstall",!
-                }
+                $$$LogLine("Module "_module_" is missing, skipping uninstall", $$$Warning)
                 kill tModuleNames(module)
             }
         }
@@ -797,7 +792,7 @@ ClassMethod UninstallAll(
 
                 kill tParams
                 merge tParams = pParams
-                write !,"Uninstalling ",tModuleName
+                $$$LogLine("Uninstalling "_tModuleName,,1)
                 set tOneSC = ##class(%IPM.Storage.Module).Uninstall(tModuleName,pForce,,.tParams)
                 if $$$ISOK(tOneSC) || pForce {
                     // If we are forcing uninstallation of everything that can be uninstalled,
@@ -815,7 +810,7 @@ ClassMethod UninstallAll(
                     set tProgressMade = 1
                 }
                 if $$$ISERR(tOneSC) {
-                    write !,"Error uninstalling ",tModuleName,": ",$system.Status.GetErrorText(tOneSC)
+                    $$$LogLine("Error uninstalling "_tModuleName_": "_$system.Status.GetErrorText(tOneSC), $$$Error, 1)
                     set tSC = $system.Status.AppendStatus(tSC,tOneSC)
                     set tFailedModules(tModuleName) = ""
                 }
@@ -1280,9 +1275,7 @@ ClassMethod LoadNewModule(
                 if +##class(%IPM.Repo.Definition).ReadOnlyGetStored(tRepositoryId) {
                     // Set in params directly so that this value gets transmitted downstream
                     set params("DeveloperMode") = 0
-                    if tVerbose {
-                        write !, "Repository "_pRepository_" is Read-Only so "_tDisplayName_" will be loaded in non-developer mode"
-                    }
+                    $$$LogLine("Repository "_pRepository_" is Read-Only so "_tDisplayName_" will be loaded in non-developer mode")
                 }
             }
         }
@@ -1338,9 +1331,7 @@ ClassMethod LoadNewModule(
             tcommit
         }
         set params("RootDirectory") = pDirectory
-        if tVerbose || $get(params("Multicompile","Verbose"),0) {
-            write !,"Loading "_tDisplayName_" in process "_$job
-        }
+        $$$LogLine("Loading "_tDisplayName_" in process "_$job)
         // We're running everything up through ApplyUpdateSteps (including Activate) so idempotent Invokes are still a good way to add new features with automation needed.
         set lifeCyclePhase = $select(isUpdate: "ApplyUpdateSteps", 1: "Activate")
         set tSC = ##class(%IPM.Storage.Module).ExecutePhases(tModuleName, $listbuild(lifeCyclePhase), 1, .params, pLog)
@@ -1376,24 +1367,20 @@ ClassMethod LoadDependencies(
     set permitDowngrade = +$get(pParams("PermitDowngrade"))
     set ignoreInstalled = +$get(pParams("IgnoreInstalled"))
     set coUpdatingModules = $get(pParams("CoUpdatingModules"))
-    write !, "Building dependency graph..." // Intentionally always write even in non-verbose mode
+    $$$LogLine("Building dependency graph...",, 1)
     set sc = pModule.BuildDependencyGraph(.dependencyGraph,,reloadSnapshots,,phaseList,,,,ignoreInstalled,,permitDowngrade,,,,.coUpdatingModules)
     $$$ThrowOnError(sc)
-    write "Done."
+    $$$LogLine("Done.",, 1)
 
     // Install dependencies from the graph
     do ..ConstructInvertedDependencyGraph(.dependencyGraph, .invertedDependencyGraph)
-    if isVerbose {
-        write !, "Created inverted dependency graph from dependency graph"
-    }
+    $$$LogLine("Created inverted dependency graph from dependency graph")
 
     #dim flatDepList As %Library.ListOfObjects
     set flatDepList = ..GetFlatDependencyListFromInvertedDependencyGraph(.invertedDependencyGraph)
-    if isVerbose {
-        write !, "Constructed flat dependency list from inverted dependency graph"
-        write !, "Starting installation of dependencies..."
-        write !
-    }
+    $$$LogLine("Constructed flat dependency list from inverted dependency graph")
+    $$$LogLine("Starting installation of dependencies...")
+    $$$LogLine("")
 
     set coUpdatingModules = ""
     for i = 1:1:flatDepList.Count() {
@@ -1417,7 +1404,8 @@ ClassMethod LoadDependencies(
         try {
             do ##class(%IPM.General.LockFile).CreateLockFileForModule(pModule, flatDepList, .pParams)
         } catch (ex) {
-            write !, $$$FormatText("Error creating lock file for %1 - %2", pModule.Name, ex.DisplayString()), !
+            set line = "Error creating lock file for " _ pModule.Name _ " - " _ ex.DisplayString()
+            $$$LogLine(line, $$$Error)
         }
     }
 }
@@ -2108,13 +2096,29 @@ ClassMethod EndCaptureOutput(
 {
     #dim tLast,tKey,tValue As %String
 
-    if pCookie'="" {
-        #; Use the original redirected routine
+    // If this routine was nested within another chained capture, the correct I/O handler is restored. In the case that the chained capture is no longer active, the chained capture routine's prior I/O handler needs to be reinstated
+    if pCookie = $get($$$IPMLogCapture("chainedCaptureIOHandler"), -1) {
+        if '$get($$$IPMLogCapture("active")) {
+            // The chained log capture ended while this capture was on top, so restore the handler it replaced
+            set tPriorIOHandler = $get($$$IPMLogCapture("priorIOHandler"))
+            if tPriorIOHandler'="" {
+                use $io::("^"_tPriorIOHandler)
+            } else {
+                do ##class(%Device).ReDirectIO(0)
+                use $io::("")
+            }
+            kill $$$IPMLogCapture
+        } else {
+            // The chained log capture is still active, so hand output back to it
+            use $io::("^"_pCookie)
+        }
+    } elseif pCookie'="" {
+        // Use the original redirected routine
         use $io::("^"_pCookie)
     } else {
-        #; Otherwise switch redirection off
+        // Otherwise switch redirection off
         do $zutil(82,12,0)
-        #; Explicitly clear the Device Mnemonic Routine to avoid test isolation issues
+        // Explicitly clear the Device Mnemonic Routine to avoid test isolation issues
         use $io::("")
     }
 
@@ -2734,7 +2738,7 @@ ClassMethod %EvaluateSystemExpression(pString As %String) As %String [ Internal 
 
     if '$get($$$DeprecationWarned("<expression>", "dbrole")) && ((result [ "${dbrole}") || (result [ "{$dbrole}")) {
         set $$$DeprecationWarned("<expression>", "dbrole") = 1
-        write !, $$$FormattedLine($$$Red, "WARNING: The {$dbrole}/${dbrole} expression is deprecated. Please contact package developer to use {$globalsDbRole} instead.")
+        $$$LogLine("The {$dbrole}/${dbrole} expression is deprecated. Please contact package developer to use {$globalsDbRole} instead.", $$$Warning, 1)
     }
     set dbRole = ..GetDatabaseRole()
     set result = ..%RegExReplace(result, "dbrole", dbRole)
