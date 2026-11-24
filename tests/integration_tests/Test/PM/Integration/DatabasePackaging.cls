@@ -21,13 +21,13 @@ Property CreatedGlobalsDatabases As %List;
 
 /// Web applications any test in this class causes to be created, by name. They live in %SYS, so
 /// deleting the namespace one points at does not remove it; they are deleted in OnAfterAllTests.
-/// Register with TrackWebApp before the call that creates one, so an assertion failure part-way
-/// through a test still leaves the name on the list.
-Property TrackedWebApps As %List;
+/// Register with AddWebAppForDeletion before the call that creates one, so an assertion failure
+/// part-way through a test still leaves the name on the list.
+Property WebAppsForDeletion As %List;
 
 /// Files and directories outside the test sandbox that fixtures create, such as FileCopy targets.
-/// Deleted in OnAfterAllTests. Register with TrackPath before the call that creates one.
-Property TrackedPaths As %List;
+/// Deleted in OnAfterAllTests. Register with AddPathForDeletion before the call that creates one.
+Property PathsForDeletion As %List;
 
 /// Packaging namespaces are shared across tests to avoid the ~10s overhead of creating and
 /// tearing down a namespace + globals DB for every test. Each shared NS is lazily initialized
@@ -104,8 +104,8 @@ Method OnBeforeAllTests() As %Status
     set ..SharedNS1 = ""
     set ..SharedNS2 = ""
     set ..SharedGlobalsDatabases = ""
-    set ..TrackedWebApps = ""
-    set ..TrackedPaths = ""
+    set ..WebAppsForDeletion = ""
+    set ..PathsForDeletion = ""
 
     set ..SharedPackageDir = ##class(%File).NormalizeDirectory(##class(%File).ManagerDirectory() _ "pkg-test-shared")
     if ##class(%Library.File).DirectoryExists(..SharedPackageDir) {
@@ -167,8 +167,8 @@ Method OnAfterAllTests() As %Status
 
     // Web applications live in %SYS and survive namespace deletion, so they are removed by name.
     set $namespace = "%SYS"
-    for i=1:1:$listlength(..TrackedWebApps) {
-        set appName = $listget(..TrackedWebApps, i)
+    for i=1:1:$listlength(..WebAppsForDeletion) {
+        set appName = $listget(..WebAppsForDeletion, i)
         try {
             if (appName '= "") && ##class(Security.Applications).Exists(appName) {
                 $$$ThrowOnError(##class(Security.Applications).Delete(appName))
@@ -179,9 +179,9 @@ Method OnAfterAllTests() As %Status
     }
     set $namespace = ..OriginalNamespace
 
-    for i=1:1:$listlength(..TrackedPaths) {
+    for i=1:1:$listlength(..PathsForDeletion) {
         try {
-            do ..DeletePath($listget(..TrackedPaths, i))
+            do ..DeletePath($listget(..PathsForDeletion, i))
         } catch ex {
             set sc = $$$ADDSC(sc, ex.AsStatus())
         }
@@ -273,15 +273,15 @@ Method PromoteLastCreatedToShared()
 }
 
 /// Records a web application name for deletion in OnAfterAllTests.
-Method TrackWebApp(appName As %String)
+Method AddWebAppForDeletion(appName As %String)
 {
-    set ..TrackedWebApps = ..TrackedWebApps _ $listbuild(appName)
+    set ..WebAppsForDeletion = ..WebAppsForDeletion _ $listbuild(appName)
 }
 
 /// Records a file or directory for deletion in OnAfterAllTests.
-Method TrackPath(path As %String)
+Method AddPathForDeletion(path As %String)
 {
-    set ..TrackedPaths = ..TrackedPaths _ $listbuild(path)
+    set ..PathsForDeletion = ..PathsForDeletion _ $listbuild(path)
 }
 
 /// Returns the shared packaging namespace for core modules (generally compiled-resource tests).
@@ -339,10 +339,10 @@ Method GetOrCreateSharedNS2() As %String
     do ..PromoteLastCreatedToShared()
 
     // The source loads below create these outside the namespace.
-    do ..TrackWebApp("/csp/" _ $zconvert(ns, "L") _ "/nsapp")
-    do ..TrackPath(..NSAppDirectory(ns))
-    do ..TrackPath(..ManagerParentFile("dep-res-data.txt"))
-    do ..TrackPath(..ManagerParentFile("main-res-data.txt"))
+    do ..AddWebAppForDeletion("/csp/" _ $zconvert(ns, "L") _ "/nsapp")
+    do ..AddPathForDeletion(..NSAppDirectory(ns))
+    do ..AddPathForDeletion(..ManagerParentFile("dep-res-data.txt"))
+    do ..AddPathForDeletion(..ManagerParentFile("main-res-data.txt"))
 
     new $namespace
     set $namespace = ns
@@ -588,7 +588,7 @@ Method TestInstallRejectedWhenModulesWouldBeOrphaned()
 {
     set depModuleDir = ..GetModuleDir("db-packaging", "dep-module")
     set noCodeDir = ..GetModuleDir("db-packaging", "module-without-code")
-    do ..TrackPath(..ManagerParentFile("no-code-data.txt"))
+    do ..AddPathForDeletion(..ManagerParentFile("no-code-data.txt"))
 
     new $namespace
     set dbPackage = ..GetOrCreateDatabasePackage("simple-db-module")
@@ -909,8 +909,8 @@ Method TestNamespaceRelativeWebAppAppliedDuringInstall()
     set installNS = "TESTDBNSWEBINS"
     set appDir = ..NSAppDirectory(installNS)
     set appName = "/csp/" _ $zconvert(installNS, "L") _ "/nsapp"
-    do ..TrackWebApp(appName)
-    do ..TrackPath(appDir)
+    do ..AddWebAppForDeletion(appName)
+    do ..AddPathForDeletion(appDir)
     // A leftover target directory would let the file assertions below pass on stale files.
     do ..DeletePath(appDir)
 
@@ -1193,7 +1193,7 @@ Method TestDependencyResourcesAppliedDuringInstall()
     set depResDir = ..GetModuleDir("db-packaging", "dep-with-resources")
     set packagingNS = ..GetOrCreateSharedNS2()
     // Packaging downloads the dependency's requirements.txt wheels into its source directory.
-    do ..TrackPath(##class(%Library.File).NormalizeDirectory("wheels", depResDir))
+    do ..AddPathForDeletion(##class(%Library.File).NormalizeDirectory("wheels", depResDir))
 
     new $namespace
     set $namespace = packagingNS
@@ -1211,6 +1211,10 @@ Method TestDependencyResourcesAppliedDuringInstall()
     set depCopyTarget = ..ManagerParentFile("dep-res-data.txt")
     do ..DeletePath(depCopyTarget)
 
+    // The source load already left the root's value in place. Overwrite it so the final assert
+    // proves the install merged it again.
+    do ..SetGlobals8KB(130000)
+
     do ..InstallDatabasePackage("TESTDBDEPRESINS", packageFile)
     do $$$AssertEquals(##class(DepRes.Generated).GetGeneratedValue(), "Dependency generated value", "Dependency Generated resource shipped in the IRIS.DAT")
     do $$$AssertTrue(##class(%Library.File).Exists(depCopyTarget), "Dependency FileCopy applied during install")
@@ -1218,14 +1222,14 @@ Method TestDependencyResourcesAppliedDuringInstall()
 
     // Root CPF value wins: the dependency merged after the root's Initialize, so the root
     // re-asserted its own merge afterwards.
-    do ..AssertGlobals8KB(170000, "Root CPF value survives — re-asserted after the dependency merge")
+    do ..AssertGlobals8KB(170000, "Root CPF value re-asserted after the dependency merge")
 }
 
 /// Asserts the [config] globals 8KB-buffer setting both CPF fixtures target.
 /// Read-back property name matches the one Test.PM.Integration.CPFMerge asserts on.
 /// A CPF merge is instance-wide, not namespace-scoped, so this test leaves globals8kb at the
 /// root fixture's value for whatever runs next. Test.PM.Integration.CPFMerge asserts its own
-/// value after its own merge, so it is unaffected by run order — but any new test that reads
+/// value after its own merge, so it is unaffected by run order. Any new test that reads
 /// globals8kb without merging first must not assume the instance default.
 Method AssertGlobals8KB(
 	expected As %Integer,
@@ -1235,6 +1239,15 @@ Method AssertGlobals8KB(
     set $namespace = "%SYS"
     do $$$AssertStatusOK(##class(Config.config).Get(.props), "Read [config] section")
     do $$$AssertEquals(props("globals8kb"), expected, message)
+}
+
+/// Sets the [config] globals 8KB-buffer setting AssertGlobals8KB reads.
+Method SetGlobals8KB(value As %Integer)
+{
+    new $namespace
+    set $namespace = "%SYS"
+    set props("globals8kb") = value
+    do $$$AssertStatusOK(##class(Config.config).Modify(.props), "Set globals8kb to " _ value)
 }
 
 /// Copying the routines database for a package, in a dedicated namespace so the dismount does not

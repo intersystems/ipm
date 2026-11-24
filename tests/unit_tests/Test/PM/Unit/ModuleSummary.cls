@@ -1,5 +1,5 @@
 /// Unit tests for the lines that the show command prints. Modules are built in memory and never saved.
-Class Test.PM.Unit.ModuleSummary Extends %UnitTest.TestCase
+Class Test.PM.Unit.ModuleSummary Extends Test.PM.Unit.Utils
 {
 
 Method TestTitle()
@@ -188,46 +188,6 @@ Method TestParseRequirements()
     do stream.Write("requests" _ $char(13, 10) _ $char(10) _ "# comment" _ $char(10) _ "  numpy>=1.26  " _ $char(13, 10) _ "--index-url https://example.com/simple" _ $char(10))
     set requirements = ##class(%IPM.General.ModuleSummary).ParseRequirements(stream)
     do $$$AssertEquals(requirements.%ToJSON(), ["requests","numpy>=1.26","--index-url https://example.com/simple"].%ToJSON())
-}
-
-ClassMethod NewModule() As %IPM.Storage.Module
-{
-    set module = ##class(%IPM.Storage.Module).%New()
-    set module.Name = "my-app"
-    set module.VersionString = "1.2.3"
-    return module
-}
-
-/// attributes alternates key and value, e.g. AddResource(module, "/api", "WebApplication", , "Url", "/api")
-ClassMethod AddResource(
-	module As %IPM.Storage.Module,
-	name As %String,
-	processorClass As %String = "",
-	scope As %String = "",
-	attributes... As %String) As %IPM.Storage.ResourceReference
-{
-    set resource = ##class(%IPM.Storage.ResourceReference).%New()
-    set resource.Name = name
-    set resource.ProcessorClass = processorClass
-    set resource.Scope = scope
-    for i = 1:2:$get(attributes) {
-        do resource.Attributes.SetAt(attributes(i + 1), attributes(i))
-    }
-    set resource.Module = module
-    return resource
-}
-
-ClassMethod AddDependency(
-	module As %IPM.Storage.Module,
-	name As %String,
-	versionString As %String,
-	scope As %String = "")
-{
-    set dependency = ##class(%IPM.Storage.ModuleReference).%New()
-    set dependency.Name = name
-    set dependency.VersionString = versionString
-    set dependency.Scope = scope
-    do module.Dependencies.Insert(dependency)
 }
 
 /// Returns the 1-based position of the first line whose normalized form equals expected, or 0.

@@ -151,7 +151,7 @@ Creates a .tgz archive of module source files. Equivalent to the existing `packa
 </description>
 <parameter name="module" required="true" description="Name of module to package" />
 <modifier name="path" aliases="p" dataAlias="Path" value="true" description="Output directory for the .tgz file." />
-<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="Controls whether dependencies are exported." />
+<modifier name="export-deps" value="true" valueList="0,1" dataAlias="ExportDependencies" description="Controls whether ObjectScript dependencies are exported." />
 <modifier name="export-python-deps" dataAlias="ExportPythonDependencies" dataValue="1" description="Exports Python dependencies." />
 </command>
 

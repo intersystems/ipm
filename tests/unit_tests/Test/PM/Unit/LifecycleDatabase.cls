@@ -1,4 +1,4 @@
-Class Test.PM.Unit.LifecycleDatabase Extends %UnitTest.TestCase
+Class Test.PM.Unit.LifecycleDatabase Extends Test.PM.Unit.Utils
 {
 
 /// Modules created outside of this test save modules to storage under fixed names; delete them
@@ -106,6 +106,7 @@ Method TestSharedDependencyListedOnce()
 }
 
 /// A declared dependency with no installed record is left out, wherever it is declared.
+/// qq-missing is declared by both modules but never saved, so no module record exists for it.
 /// A test-scoped dependency is the usual case: a normal install never installs it.
 Method TestUninstalledDependencyOmitted()
 {
@@ -121,7 +122,8 @@ Method TestUninstalledDependencyOmitted()
 Method TestStagingHookCalledForEveryProcessor()
 {
     set targetDir = ##class(%IPM.Utils.File).CreateTempDirectory()
-    set module = ..NewModuleWithResource("probe-resource", "Test.PM.Unit.StagingProbe")
+    set module = ..NewModule("staging-check")
+    do ..AddResource(module, "probe-resource", "Test.PM.Unit.StagingProbe")
     do ##class(%IPM.Lifecycle.Database).StageModuleResources(module, targetDir, 0, .params)
 
     do $$$AssertTrue(##class(%Library.File).Exists(##class(%Library.File).NormalizeFilename("probe-staged", targetDir)), "Processor staged its own file")
@@ -139,9 +141,9 @@ Method TestFileCopyExpressionSourceNotStaged()
     do $$$AssertStatusOK(stream.Write("not staged"), "Wrote root file")
     do $$$AssertStatusOK(stream.%Save(), "Saved root file")
 
-    set module = ..NewModuleWithResource("expr-source.txt", "FileCopy")
+    set module = ..NewModule("staging-check")
     set module.Root = rootDir
-    set resource = module.Resources.GetAt(1)
+    set resource = ..AddResource(module, "expr-source.txt", "FileCopy")
     // Module.xml import records Name as an attribute too and it overrides its SourceDirectory alias.
     do resource.Attributes.SetAt("expr-source.txt", "Name")
     do resource.Attributes.SetAt("${mgrdir}does-not-exist/", "SourceDirectory")
@@ -177,53 +179,6 @@ Method TestPackageModuleXMLKeepsMultibyteCharacters()
     }
     do nlsTable.SetIOTable(3, originalFileTable)
     do ##class(%IPM.Utils.File).RemoveDirectoryTree(targetDir)
-}
-
-/// Returns an unsaved module holding one resource named resourceName handled by processorClass.
-Method NewModuleWithResource(
-	resourceName As %String,
-	processorClass As %String) As %IPM.Storage.Module
-{
-    set module = ##class(%IPM.Storage.Module).%New()
-    set module.Name = "staging-check"
-    set module.VersionString = "1.0.0"
-    set resource = ##class(%IPM.Storage.ResourceReference).%New()
-    set resource.Name = resourceName
-    set resource.ProcessorClass = processorClass
-    do module.Resources.Insert(resource)
-    quit module
-}
-
-/// Saves a module record named name at version 1.0.0 that depends on each name in dependencyNames,
-/// and on each name in testDependencyNames with Scope="test".
-Method SaveModule(
-	name As %String,
-	dependencyNames As %List = "",
-	testDependencyNames As %List = "") As %IPM.Storage.Module
-{
-    set module = ##class(%IPM.Storage.Module).%New()
-    set module.Name = name
-    set module.VersionString = "1.0.0"
-    do ..AddDependencies(module, dependencyNames, "")
-    do ..AddDependencies(module, testDependencyNames, "test")
-    do $$$AssertStatusOK(module.%Save(), "Saved " _ name)
-    quit module
-}
-
-/// Adds a dependency at version 1.0.0 with the given scope for each name in names.
-Method AddDependencies(
-	module As %IPM.Storage.Module,
-	names As %List,
-	scope As %String)
-{
-    set ptr = 0
-    while $listnext(names, ptr, depName) {
-        set dep = ##class(%IPM.Storage.ModuleReference).%New()
-        set dep.Name = depName
-        set dep.VersionString = "1.0.0"
-        set dep.Scope = scope
-        do module.Dependencies.Insert(dep)
-    }
 }
 
 /// Pins the exclusions actually taking effect, so removing one is a visible test change rather

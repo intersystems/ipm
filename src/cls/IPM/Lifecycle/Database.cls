@@ -1229,8 +1229,7 @@ Method PerformDatabaseSwap(
     try {
         // Rename the current IRIS.DAT to IRIS_<dbname>_YYYYMMDDHHmmss.DAT. The timestamp has
         // one-second resolution, so a counter suffix follows if that name is taken.
-        set h = $horolog
-        set timestamp = $translate($zdate(h, 8), "-", "") _ $translate($ztime($piece(h, ",", 2), 2), ":", "")
+        set timestamp = $translate($zdatetime($horolog, 8, 1), " :")
         set backupBase = ##class(%Library.File).Construct(dbDir, "IRIS_" _ routinesDBName _ "_" _ timestamp)
         set candidate = backupBase _ ".DAT"
         set suffix = 0
