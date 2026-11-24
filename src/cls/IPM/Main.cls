@@ -2435,7 +2435,7 @@ ClassMethod Load(
 		do ..LoadInternal(.pCommandInfo, log)
 	} catch Ex {
         $$$LogLine(Ex.DisplayString(), $$$Error)
-		$$$ThrowOnError(log.Finalize(Ex.AsStatus(), devMode))
+		$$$ThrowOnError(log.Finalize(Ex.AsStatus()))
 		throw Ex
 	}
 	$$$ThrowOnError(log.Finalize($$$OK))
@@ -2492,17 +2492,16 @@ ClassMethod LoadInternal(
                 $$$ThrowStatus($$$ERROR($$$GeneralError,"No module.xml file found in archive."))
             }
 
-        // The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
-        set tModuleFilePath = $listget(tList(tCount), *)
-        set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
-        set idx = ""
-        for {
-            set idx = $order(tList(idx))
-            quit:(idx="")
-            $$$LogLine("module.xml file found: "_$list(tList(idx), *))
-        }
-        $$$LogLine("Using module.xml file at "_tModuleFilePath)
-    }
+            // The top-level module.xml is the last one in tList, assuming ##class(%File).FileSetFunc returns directory first
+            set tModuleFilePath = $listget(tList(tCount), *)
+            set tTargetDirectory = ##class(%File).GetDirectory(tModuleFilePath, 1)
+            set idx = ""
+            for {
+                set idx = $order(tList(idx))
+                quit:(idx="")
+                $$$LogLine("module.xml file found: "_$list(tList(idx), *))
+            }
+            $$$LogLine("Using module.xml file at "_tModuleFilePath)
 
             // For tarballs, copy the extracted content to <ModuleRoot>/<name>/<version>/
             // and clean up the temp extraction directory. Directory loads are left in-place so that
@@ -2682,10 +2681,10 @@ ClassMethod Install(
         }
     } catch ex {
         $$$LogLine(ex.DisplayString(), $$$Error)
-        $$$ThrowOnError(log.Finalize(ex.AsStatus(), devMode))
+        $$$ThrowOnError(log.Finalize(ex.AsStatus()))
         throw ex
     }
-    $$$ThrowOnError(log.Finalize($$$OK, devMode))
+    $$$ThrowOnError(log.Finalize($$$OK))
 }
 
 ClassMethod Reinstall(ByRef pCommandInfo) [ Internal ]
