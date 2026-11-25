@@ -1,6 +1,6 @@
 {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://raw.githubusercontent.com/intersystems/ipm/main/schemas/ipm-log/1.0.0",
+    "$id": "https://raw.githubusercontent.com/intersystems/ipm/logging-framework/schemas/ipm-log/1.0.0/ipm-log.schema.json",
     "title": "IPM Log Record",
     "description": "Schema (version 1.0.0) for a single record in an IPM JSON Lines (NDJSON) log file. Each line of a '.jsonl' log is one JSON document: the first line is a header record and every subsequent line is a log entry.",
     "$comment": "Validate each line of the NDJSON log independently against this schema; the file as a whole is not a single JSON document.",
