@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #806: Web applications in a module.xml from `generate` now load instead of failing with "The following invalid attributes were found". A CSP application's source files are deployed with a `FileCopy` resource, and enabling JWT no longer fails with `<UNDEFINED>`.
 - #503: `generate` names each package resource after the deepest package its classes share, such as `MyApp.Local.PKG` instead of `MyApp.PKG`
 - `generate` stops with an error when the source folder does not exist, instead of writing a module.xml with no code resources
+- #1338: language = python is now declared at the method level, not at the class level.
 
 ## [0.10.10] - 2026-10-14
 
