@@ -128,7 +128,7 @@ Method InitializeLog(
 
 /// Write a log entry to both the JSON Lines and TXT files.
 /// @Argument message           The human-readable log message to append
-/// @Argument level             The log level: TRACE, INFO, WARNING, or ERROR. If none supplied, defaults to INFO
+/// @Argument level             Value list in %IPM.General.LogLevel. If none supplied, defaults to INFO.
 /// @Argument writeToTerminal   If set to 1, write line to terminal, regardless of the default verbosity setting
 Method WriteLogLine(
 	message As %String,
@@ -138,24 +138,15 @@ Method WriteLogLine(
     set sc = $$$OK
     try {
         if (..Verbose || writeToTerminal) {
-            set color = $select($$$Error: $$$Red, $$$Warning: $$$Yellow, $$$Info: $$$Default, $$$Trace: $$$Magenta)
+            set color = $select($$$Error: $$$Red, $$$Warning: $$$Yellow, $$$Info: $$$Default, $$$Trace: $$$Magenta, 1: $$$Default)
             write !, $$$FormattedLine(color, message)
         }
+
         if '..Initialized {
             return $$$OK
         }
 
-        if '$listfind($listfromstring(..#LogLevels), level) {
-            set errMsg = "Attempted to write to IPM command logs ("_..JSONFilePath_" and "_ ..TxtFilePath_") with invalid log level '"_level_"'. Please ensure log level is one of: "_..#LogLevels_$$$NL_"Attempted message to log was: "_message
-            $$$ThrowOnError($$$ERROR($$$GeneralError, errMsg))
-            $$$ThrowOnError($$$ERROR(##class(%IPM.General.LogLevel).IsValid(level), "Attempted message to log: "_message))
-        }
-
-        try {
-            do ##class(%IPM.General.LogLevel).IsValid(level)
-        } catch ex {
-            $$$ThrowOnError($$$ERROR($$$GeneralError, "Invalid log level '"_level_"' for log message '"_message_"'."))
-        }
+        $$$ThrowOnError(##class(%IPM.General.LogLevel).IsValid(level))
 
         set timestamp = $zdatetime($ztimestamp, 3) _ " UTC"
 
