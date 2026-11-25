@@ -124,9 +124,6 @@ Method BuildCache(
     set tSC = $$$OK
     set tInitTLevel = $tlevel
     try {
-        set tLogManager = ##class(%IPM.General.LogManager).%Get(.tSC)
-        $$$ThrowOnError(tSC)
-
         // Instantiate at this level for the performance benefit
         set tXSLTProvider = ##class(%IPM.Repo.XSLTProvider).%Get(.tSC)
         $$$ThrowOnError(tSC)
@@ -215,7 +212,7 @@ Method AddCacheItem(
         set tParseSC = ..GetModuleStreamFromFile(pModuleFileName,.tStream,.pName,.pVersionString)
         if $$$ISERR(tParseSC) {
             // Log as a warning, but keep going.
-            do ##class(%IPM.General.LogManager).Warning("Failed to parse module manifest in "_pModuleFileName_": "_$system.Status.GetErrorText(tParseSC),1)
+            $$$LogLine("Failed to parse module manifest in "_pModuleFileName_": "_$system.Status.GetErrorText(tParseSC), $$$Warning, 1)
             quit
         }
 

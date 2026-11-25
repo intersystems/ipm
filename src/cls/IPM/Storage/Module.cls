@@ -153,12 +153,12 @@ Method HandleAllUpdateSteps(
 }
 
 /// For a given version, seed or execute update steps listed in the module's update package version class
-/// 
+///
 /// If seeding: For only steps that don't have a TimeStampEnd value or have an errored status, set it's TimeStampEnd to the current time
-/// 
+///
 /// If executing: Only start running steps at the first one found not to have a TimeStampEnd value or if an errored step is found
 ///               After finding this step, run it and all subsequent steps, regardless of if they have been run or not.
-/// 
+///
 /// newStepToApply - Gets marked as true to tell us to run all remaining steps in the list, whether or not they have been run/seeded before
 ///                  Can carry this over to subsequent calls by passing the newStepToApply variable to those HandleUpdateStepsFromList() calls
 Method HandleUpdateStepsFromList(
@@ -335,7 +335,7 @@ ClassMethod CheckSystemRequirements(pModuleName As %String) As %Status
 Method WriteAfterInstallMessage()
 {
     if ..AfterInstallMessage '= "" {
-        $$$LogLine(..%Evaluate(..AfterInstallMessage))
+        $$$LogLine(..%Evaluate(..AfterInstallMessage),,1)
     }
 }
 
@@ -542,7 +542,7 @@ ClassMethod ExecutePhases(
                 set tLifecycle = tModule.Lifecycle
                 set tLifecycle.PhaseList = tPhases
                 set line = "["_tModule.DisplayName_"]"_$char(9)_"Module object refreshed."
-                $$$LogLine(line)
+                $$$LogLine(line,,1)
                 continue
             }
             // history logging for phases
@@ -557,7 +557,7 @@ ClassMethod ExecutePhases(
                 if tOnePhase = "Reload" {
                     set line = line_" ("_tModule.Root_")"
                 }
-                $$$LogLine(line)
+                $$$LogLine(line,,1)
 
                 // Notify source control (no-op if not configured)
                 set tSC = ##class(%IPM.ExtensionBase.SourceControl.Interface).%OnBeforePhase(tModule,tOnePhase,.pParams)
@@ -631,7 +631,7 @@ ClassMethod ExecutePhases(
                         if tTiming {
                             set line = line_" ("_($zhorolog-tStart)_" s)"
                         }
-                        $$$LogLine(line)
+                        $$$LogLine(line,,1)
                         // Skip all post-phase processing - classes have been deleted
                         continue
                     }
@@ -679,13 +679,16 @@ ClassMethod ExecutePhases(
 
             if $$$ISERR(tSC) {
                 set line = "["_tModule.DisplayName_"]"_$char(9)_tOnePhase_" FAILURE"_$select(tTiming:" ("_($zhorolog-tStart)_" s)",1:"")
+                set level = $$$Error
             } else {
                 set line = "["_$namespace_"|"_tModule.DisplayName_"]"_$char(9)_tOnePhase_" SUCCESS"
+                set level = $$$Info
             }
             if tTiming {
                 set line = line_" ("_($zhorolog-tStart)_" s)"
+                set level = $$$Info
             }
-            $$$LogLine(line)
+            $$$LogLine(line,level,1)
             $$$ThrowOnError(tSC)
 
             if pLog '= "" {
@@ -694,7 +697,7 @@ ClassMethod ExecutePhases(
         }
         if tOverallTiming {
             set line = "["_tModule.DisplayName_"]"_$char(9)_"(total time: "_($zhorolog-tFullStart)_" s)"
-            $$$LogLine(line)
+            $$$LogLine(line,,1)
         }
     } catch e {
         set tSC = e.AsStatus()
@@ -1442,7 +1445,7 @@ Method OverrideLifecycleClassSet(pValue As %Dictionary.Classname) As %Status
 
 /// This callback method is invoked by the <METHOD>%New</METHOD> method to
 /// provide notification that a new instance of an object is being created.
-/// 
+///
 /// <P>If this method returns an error then the object will not be created.
 /// <p>It is passed the arguments provided in the %New call.
 /// When customizing this method, override the arguments with whatever variables and types you expect to receive from %New().
@@ -1458,7 +1461,7 @@ Method %OnNew() As %Status [ Private, ServerOnly = 1 ]
 
 /// This callback method is invoked by the <METHOD>%Open</METHOD> method to
 /// provide notification that the object specified by <VAR>oid</VAR> is being opened.
-/// 
+///
 /// <P>If this method returns an error then the object will not be opened.
 Method %OnOpen() As %Status [ Private, ServerOnly = 1 ]
 {
@@ -1488,7 +1491,7 @@ Method %OnOpen() As %Status [ Private, ServerOnly = 1 ]
 
 /// This callback method is invoked by the <METHOD>%ValidateObject</METHOD> method to
 /// provide notification that the current object is being validated.
-/// 
+///
 /// <P>If this method returns an error then <METHOD>%ValidateObject</METHOD> will fail.
 Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 {
@@ -1577,7 +1580,7 @@ Method %OnValidateObject() As %Status [ Private, ServerOnly = 1 ]
 /// either because %Save() was invoked on this object or on an object that references this object.
 /// %OnAddToSaveSet can modify the current object. It can also add other objects to the current
 /// SaveSet by invoking %AddToSaveSet or remove objects by calling %RemoveFromSaveSet.
-/// 
+///
 /// <P>If this method returns an error status then %Save() will fail and the transaction
 /// will be rolled back.
 Method %OnAddToSaveSet(
@@ -1612,7 +1615,7 @@ Method %OnAddToSaveSet(
 }
 
 /// Get an instance of an XML enabled class.<br><br>
-/// 
+///
 /// You may override this method to do custom processing (such as initializing
 /// the object instance) before returning an instance of this class.
 /// However, this method should not be called directly from user code.<br>
@@ -1855,9 +1858,9 @@ Method %Evaluate(
 /// This callback method is invoked by the <METHOD>%Save</METHOD> method to
 /// provide notification that the object is being saved. It is called before
 /// any data is written to disk.
-/// 
+///
 /// <P><VAR>insert</VAR> will be set to 1 if this object is being saved for the first time.
-/// 
+///
 /// <P>If this method returns an error then the call to <METHOD>%Save</METHOD> will fail.
 Method %OnBeforeSave(insert As %Boolean) As %Status [ Private, ServerOnly = 1 ]
 {

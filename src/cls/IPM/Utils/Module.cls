@@ -1171,16 +1171,6 @@ ClassMethod LoadNewModule(
         }
         set commandLineModuleName = $get(params("ModuleName"))
 
-        // Create a singleton instance for logging of warnings/error messages
-        set tLogManager = ##class(%IPM.General.LogManager).%Get(.tSC)
-        $$$ThrowOnError(tSC)
-
-        // Show INFO+ if verbose, WARNING+ if not.
-        set tMinLogLevel = $select(tVerbose:1,1:2)
-        if (tLogManager.Threshold > tMinLogLevel) {
-            set tLogManager.Threshold = tMinLogLevel
-        }
-
         set pDirectory = ##class(%File).NormalizeDirectory("",pDirectory)
 
         if ($get(params("NoJournal"),0) '= 0) {
@@ -2041,7 +2031,7 @@ ClassMethod BeginCaptureOutput(Output pCookie As %String) As %Status [ Procedure
         #; If re-direction is already active
         if $zutil(82,12) {
             #; Retain the name of the re-directed routine
-            set pCookie=$zutil(96,12)
+            set pCookie=$$$CurrentRedirectionHandlerRoutine
         } else {
             set pCookie=""
         }

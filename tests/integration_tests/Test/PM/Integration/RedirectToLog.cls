@@ -133,7 +133,7 @@ Method TestCommandErrorRestoresRedirection()
 
     // Record the redirection baseline so we can prove the shell handed control back after the failure.
     set originalRedirect = ##class(%Device).ReDirectIO()
-    set originalHandler = $select(originalRedirect : $zutil(96, 12), 1 : "")
+    set originalHandler = $select(originalRedirect : $$$CurrentRedirectionHandlerRoutine, 1 : "")
 
     // The module Invoke opens the tee and rethrows an erroring import; the shell catches it and reports failure.
     set sc = ##class(%IPM.Main).Shell("load -v " _ moduleDir)
@@ -142,7 +142,7 @@ Method TestCommandErrorRestoresRedirection()
     // The failed command must leave redirection exactly as it found it.
     set finalRedirect = ##class(%Device).ReDirectIO()
     do $$$AssertEquals(finalRedirect, originalRedirect, "Redirection state WAS restored after the failed command")
-    set finalHandler = $select(finalRedirect : $zutil(96, 12), 1 : "")
+    set finalHandler = $select(finalRedirect : $$$CurrentRedirectionHandlerRoutine, 1 : "")
     do $$$AssertEquals(finalHandler, originalHandler, "Original I/O handler WAS restored after the failed command")
     do $$$AssertNotTrue($data($$$IPMLogCapture("active")), "Chained capture state WAS cleared after the failed command")
 
@@ -240,7 +240,7 @@ Method TestEndWithHandlerOnTop()
     set txtPath = log.TxtFilePath
 
     if ##class(%Device).ReDirectIO() {
-        set originalIOHandler = $zutil(96,12)
+        set originalIOHandler = $$$CurrentRedirectionHandlerRoutine
     } else {
         set originalIOHandler = ""
     }
@@ -256,7 +256,7 @@ Method TestEndWithHandlerOnTop()
     do log.Finalize()
 
     if ##class(%Device).ReDirectIO() {
-        set finalIOHandler = $zutil(96,12)
+        set finalIOHandler = $$$CurrentRedirectionHandlerRoutine
     } else {
         set finalIOHandler = ""
     }

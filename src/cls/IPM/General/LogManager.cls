@@ -7,13 +7,6 @@ Parameter LogLevels As STRING = "TRACE,INFO,WARNING,ERROR";
 
 Parameter SupportedCommands As STRING = "install,load,update,uninstall";
 
-/// Has hashes of unique messages (with data equal to the index in ..Messages of that message)
-Property UniqueMessageHashes [ MultiDimensional, Private ];
-
-Property Messages As list Of %IPM.General.LogManager.Message;
-
-Property Threshold As %Integer [ InitialExpression = {$$$ZPMLogWARNING} ];
-
 /// Command being logged (with credentials obfuscated)
 Property Command As %String;
 
@@ -37,9 +30,18 @@ Property Verbose As %Boolean [ InitialExpression = 1 ];
 /// Indicates whether the log manager has been initialized (currently writing to .txt and .jsonl log files)
 Property Initialized As %Boolean [ Calculated, ReadOnly ];
 
+/// Deprecated %IPM.General.LogManager properties as of v0.10.12
+/// Has hashes of unique messages (with data equal to the index in ..Messages of that message)
+Property UniqueMessageHashes [ MultiDimensional, Private ];
+
+Property Messages As list Of %IPM.General.LogManager.Message;
+
+Property Threshold As %Integer [ InitialExpression = {$$$ZPMLogWARNING} ];
+
+
 Method InitializedGet() As %Boolean
 {
-    return (..TxtFilePath '= "")
+    return ((..TxtFilePath '= "") && (..JSONFilePath '= ""))
 }
 
 /// Initialize log files and write headers.
@@ -64,7 +66,6 @@ Method InitializeLog(
     }
 
     set ..TimeStampStart = $zdatetime($horolog,-2)
-    // TO-DO: obfuscate sensitive information like credentials in the command before logging
     set ..Command = fullCommand
     set moduleName = $get(commandInfo("parameters","module"), "module-not-parsed")
 
@@ -76,7 +77,7 @@ Method InitializeLog(
         if $$$HasData(commandInfo,"LogFileDir") {
             set logDir = ##class(%File).NormalizeDirectory($$$GetData(commandInfo, "LogFileDir"))
         } else {
-            set mgr = ##class(%Library.File).ManagerDirectory()
+            set mgr = ##class(%File).ManagerDirectory()
             set logDir = ##class(%File).NormalizeDirectory(mgr _ normalizedNamespace _ "/ipm-logs/")
         }
         $$$ThrowOnError(##class(%File).CreateDirectoryChain(logDir))
@@ -134,10 +135,9 @@ Method WriteLogLine(
 	level As %String = "INFO",
 	writeToTerminal As %Boolean = 0) As %Status
 {
-    try
-    {
-        set verbose = ..Verbose || writeToTerminal
-        if (verbose) {
+    set sc = $$$OK
+    try {
+        if (..Verbose || writeToTerminal) {
             write !, message
         }
         if '..Initialized {
@@ -172,9 +172,7 @@ Method WriteLogLine(
         $$$ThrowOnError(txtStream.MoveToEnd())
         do txtStream.WriteLine(timestamp _ " [" _ level _ "] " _ message)
         $$$ThrowOnError(txtStream.%Save())
-    }
-    catch ex
-    {
+    } catch ex {
         set sc = ex.AsStatus()
         set consoleSc = ##class(%SYS.System).WriteToConsoleLog(ex.DisplayString())
         if $$$ISERR(consoleSc) {
@@ -207,98 +205,6 @@ Method Finalize() As %Status
     return sc
 }
 
-Method Flush(pThreshold As %Integer = {..Threshold})
-{
-    set tLastMessage = $$$NULLOREF
-    for tMessageIndex=1:1:..Messages.Count() {
-        set tMessage = ..Messages.GetAt(tMessageIndex)
-        if (tMessage.Severity >= pThreshold) {
-            if $isobject(tLastMessage) && (tMessage.GetHash() = tLastMessage.GetHash()) {
-                // Don't repeat the same message, just track the count.
-                set tMessage.Count = tLastMessage.Count + tMessage.Count
-            } elseif $isobject(tLastMessage) && (tLastMessage.Severity >= pThreshold) {
-                do tLastMessage.Display()
-            }
-            set tLastMessage = tMessage
-        }
-    }
-    if $isobject(tLastMessage) {
-        do tLastMessage.Display()
-    }
-
-    do ..Messages.Clear()
-    kill ..UniqueMessageHashes
-}
-
-/// Flushes out the log of messages before doing the standard singleton cleanup.
-Method %OnClose() As %Status [ Private, ServerOnly = 1 ]
-{
-    set tSC = ##super()
-    do ..Flush()
-    quit tSC
-}
-
-/// @API.Method
-ClassMethod Trace(
-	pMessage As %String,
-	pUnique As %Boolean = 0)
-{
-    do ..CreateMessage(pMessage, pUnique, $$$ZPMLogTRACE)
-}
-
-/// @API.Method
-ClassMethod Info(
-	pMessage As %String,
-	pUnique As %Boolean = 0)
-{
-    do ..CreateMessage(pMessage, pUnique, $$$ZPMLogINFO)
-}
-
-/// @API.Method
-ClassMethod Warning(
-	pMessage As %String,
-	pUnique As %Boolean = 0)
-{
-    do ..CreateMessage(pMessage, pUnique, $$$ZPMLogWARNING)
-}
-
-/// @API.Method
-ClassMethod Error(
-	pMessage As %String,
-	pUnique As %Boolean = 0)
-{
-    do ..CreateMessage(pMessage, pUnique, $$$ZPMLogERROR)
-}
-
-ClassMethod CreateMessage(
-	pMessage As %String,
-	pUnique As %Boolean = 0,
-	pSeverity As %Integer) [ Private ]
-{
-    set tMessage = ##class(%IPM.General.LogManager.Message).%New(pMessage,pSeverity)
-    set tInstance = ..%Get(.tSC)
-    if $$$ISOK(tSC) {
-        do tInstance.AddMessage(tMessage,pUnique)
-    } else {
-        do tMessage.Display()
-    }
-}
-
-Method AddMessage(
-	pMessage As %IPM.General.LogManager.Message,
-	pUnique As %Boolean = 0) [ Private ]
-{
-    set tHash = pMessage.GetHash()
-    if $data(..UniqueMessageHashes(tHash),tIndex) {
-        set ..Messages.GetAt(tIndex).Count = ..Messages.GetAt(tIndex).Count + 1
-    } else {
-        do ..Messages.Insert(pMessage)
-        if pUnique {
-            set ..UniqueMessageHashes(tHash) = ..Messages.Count()
-        }
-    }
-}
-
 /// Install a chained output-capture tee that routes IRIS-native output into the log in real
 /// time while still forwarding it live down the redirect chain (terminal or an outer capture).
 /// Each logical line (one per newline) is sent to <method>WriteLogLine</method>.
@@ -320,7 +226,7 @@ ClassMethod BeginChainedCaptureToLog(writeToTerminal As %Boolean = 0) [ Procedur
 
     // Record the previous redirect handler so that it can be restored once EndChainedCaptureToLog is called.
     if ##class(%Device).ReDirectIO() {
-        set priorIOHandler = $zutil(96,12)
+        set priorIOHandler = $$$CurrentRedirectionHandlerRoutine
     } else {
         set priorIOHandler = ""
     }
@@ -432,7 +338,7 @@ ClassMethod EndChainedCaptureToLog() [ ProcedureBlock = 0 ]
 
     // If I/O redirection is on, and the current redirection handler is NOT this routine,
     // then make sure to hold onto the prior I/O handler so that fwd() can pass output through to it
-    if (##class(%Device).ReDirectIO() && ($zutil(96,12) '= $zname)) {
+    if (##class(%Device).ReDirectIO() && ($$$CurrentRedirectionHandlerRoutine '= $zname)) {
         kill $$$IPMLogCapture
         set $$$IPMLogCapture("priorIOHandler") = priorIOHandler
         set $$$IPMLogCapture("chainedCaptureIOHandler") = chainedCaptureIOHandler
@@ -463,4 +369,99 @@ ClassMethod FlushCapturedBuffer(line As %String)
         set currentLogMgr.Verbose = verbose
     }
 }
+
+/* Deprecated %IPM.General.LogManager methods as of v0.10.12 */
+
+Method Flush(pThreshold As %Integer = {..Threshold}) [Deprecated]
+{
+    set tLastMessage = $$$NULLOREF
+    for tMessageIndex=1:1:..Messages.Count() {
+        set tMessage = ..Messages.GetAt(tMessageIndex)
+        if (tMessage.Severity >= pThreshold) {
+            if $isobject(tLastMessage) && (tMessage.GetHash() = tLastMessage.GetHash()) {
+                // Don't repeat the same message, just track the count.
+                set tMessage.Count = tLastMessage.Count + tMessage.Count
+            } elseif $isobject(tLastMessage) && (tLastMessage.Severity >= pThreshold) {
+                do tLastMessage.Display()
+            }
+            set tLastMessage = tMessage
+        }
+    }
+    if $isobject(tLastMessage) {
+        do tLastMessage.Display()
+    }
+
+    do ..Messages.Clear()
+    kill ..UniqueMessageHashes
+}
+
+/// Flushes out the log of messages before doing the standard singleton cleanup.
+Method %OnClose() As %Status [ Private, ServerOnly = 1, Deprecated ]
+{
+    set tSC = ##super()
+    do ..Flush()
+    quit tSC
+}
+
+/// @API.Method
+ClassMethod Trace(
+	pMessage As %String,
+	pUnique As %Boolean = 0) [Deprecated]
+{
+    do ..CreateMessage(pMessage, pUnique, $$$ZPMLogTRACE)
+}
+
+/// @API.Method
+ClassMethod Info(
+	pMessage As %String,
+	pUnique As %Boolean = 0) [Deprecated]
+{
+    do ..CreateMessage(pMessage, pUnique, $$$ZPMLogINFO)
+}
+
+/// @API.Method
+ClassMethod Warning(
+	pMessage As %String,
+	pUnique As %Boolean = 0) [Deprecated]
+{
+    do ..CreateMessage(pMessage, pUnique, $$$ZPMLogWARNING)
+}
+
+/// @API.Method
+ClassMethod Error(
+	pMessage As %String,
+	pUnique As %Boolean = 0) [Deprecated]
+{
+    do ..CreateMessage(pMessage, pUnique, $$$ZPMLogERROR)
+}
+
+ClassMethod CreateMessage(
+	pMessage As %String,
+	pUnique As %Boolean = 0,
+	pSeverity As %Integer) [ Private, Deprecated ]
+{
+    set tMessage = ##class(%IPM.General.LogManager.Message).%New(pMessage,pSeverity)
+    set tInstance = ..%Get(.tSC)
+    if $$$ISOK(tSC) {
+        do tInstance.AddMessage(tMessage,pUnique)
+    } else {
+        do tMessage.Display()
+    }
+}
+
+Method AddMessage(
+	pMessage As %IPM.General.LogManager.Message,
+	pUnique As %Boolean = 0) [ Private, Deprecated ]
+{
+    set tHash = pMessage.GetHash()
+    if $data(..UniqueMessageHashes(tHash),tIndex) {
+        set ..Messages.GetAt(tIndex).Count = ..Messages.GetAt(tIndex).Count + 1
+    } else {
+        do ..Messages.Insert(pMessage)
+        if pUnique {
+            set ..UniqueMessageHashes(tHash) = ..Messages.Count()
+        }
+    }
+}
+
 }

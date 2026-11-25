@@ -15,6 +15,9 @@ ROUTINE %IPM.Common [Type=INC]
 #define Info "INFO"
 #define Warning "WARNING"
 
+#; Descriptive $zutil macros
+#define CurrentRedirectionHandlerRoutine $zutil(96,12)
+
 #; Default packages for package manager, module lifecycle classes and resource processors
 #define ZPMRootPackage "%IPM"
 
