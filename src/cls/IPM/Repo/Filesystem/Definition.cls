@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class %IPM.Repo.Filesystem.Definition Extends %IPM.Repo.Definition
 {
 
@@ -122,9 +124,6 @@ Method BuildCache(
     set tSC = $$$OK
     set tInitTLevel = $tlevel
     try {
-        set tLogManager = ##class(%IPM.General.LogManager).%Get(.tSC)
-        $$$ThrowOnError(tSC)
-
         // Instantiate at this level for the performance benefit
         set tXSLTProvider = ##class(%IPM.Repo.XSLTProvider).%Get(.tSC)
         $$$ThrowOnError(tSC)
@@ -170,7 +169,7 @@ Method BuildCache(
 
             set tSubDirectory = tFilenameList(tKey,"sub")
             set tAggSC = $$$ADDSC(tAggSC,..AddCacheItem(tFile,tSubDirectory,.tName,.tVersionString))
-            write:pVerbose !,tName," ",tVersionString," @ ",##class(%File).NormalizeDirectory(..Root_tSubDirectory)
+            $$$LogLine(tName_" "_tVersionString_" @ "_##class(%File).NormalizeDirectory(..Root_tSubDirectory))
         }
         $$$ThrowOnError(tAggSC)
         tcommit
@@ -213,7 +212,7 @@ Method AddCacheItem(
         set tParseSC = ..GetModuleStreamFromFile(pModuleFileName,.tStream,.pName,.pVersionString)
         if $$$ISERR(tParseSC) {
             // Log as a warning, but keep going.
-            do ##class(%IPM.General.LogManager).Warning("Failed to parse module manifest in "_pModuleFileName_": "_$system.Status.GetErrorText(tParseSC),1)
+            $$$LogLine("Failed to parse module manifest in "_pModuleFileName_": "_$system.Status.GetErrorText(tParseSC), $$$Warning, 1)
             quit
         }
 
@@ -340,10 +339,10 @@ ClassMethod ScanDirectory(
             set tRes = tStmt.%Execute(tFullDir,"module.xml",,1)
             while tRes.%Next() {
                 if (tRes.%Get("Type") = "D") {
-                    write:pVerbose !,"Scanning directory: ",tRes.%Get("ItemName")
+                    $$$LogLine("Scanning directory: "_tRes.%Get("ItemName"),, pVerbose)
                     set tDirArray($increment(tDirArray)) = tDirArray(i)_$case(tDirArray(i),"":"",:"/")_tRes.%Get("ItemName")
                 } else {
-                    write:pVerbose !,"Found file: ",tRes.%Get("Name")
+                    $$$LogLine("Found file: "_tRes.%Get("Name"),, pVerbose)
                     set pFilenameList($increment(pFilenameList)) = tRes.%Get("Name")
                     set pFilenameList(pFilenameList,"sub") = tDirArray(i)
                     if (pDepth > pMaxDepth) {

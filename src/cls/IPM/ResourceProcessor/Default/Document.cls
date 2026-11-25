@@ -381,12 +381,13 @@ Method OnLoad(
                     } catch ex { }
                     if 'tProcessed {
                         try {
-                            write:tVerbose !,"Loading file " _ pFullResourcePath _ " as " _ docclass
+                            $$$LogLine("Loading file " _ pFullResourcePath _ " as " _ docclass)
                             set routineMgr = ##class(%RoutineMgr).%OpenId(..ResourceReference.Name)
                             do routineMgr.Code.Rewind()
                             do routineMgr.Code.CopyFrom(stream)
                             $$$ThrowOnError(routineMgr.%Save())
-                            write:tVerbose !,"Imported document: ", ..ResourceReference.Name, !, "Load finished successfully.", !
+                            $$$LogLine("Imported document: "_..ResourceReference.Name)
+                            $$$LogLine("Load finished successfully.")
                             set tProcessed = 1
                         } catch ex { }
                     }

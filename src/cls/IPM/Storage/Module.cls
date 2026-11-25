@@ -93,15 +93,12 @@ Property UpdatePackage As %Dictionary.Classname;
 /// seedSteps: (Default) 0 = Execute Steps | 1 = Seeds Steps
 Method HandleAllUpdateSteps(
 	logFile As %Library.File = "",
-	seedSteps As %Boolean = 0,
-	verbose As %Boolean = 0) As %Status
+    seedSteps As %Boolean = 0) As %Status
 {
     set sc = $$$OK
     // Only need to acquire lock when applying the steps, not when seeding them
     if 'seedSteps {
-        if verbose {
-            write !, "Acquiring lock on ^IPM.UpdateLock("_..Name_")"
-        }
+        $$$LogLine("Acquiring lock on ^IPM.UpdateLock("_..Name_")")
         $$$LockUpdateModule(..Name)
         if ('$test) {
             return sc
@@ -118,42 +115,37 @@ Method HandleAllUpdateSteps(
                 quit
             }
             set className = classList(keyVersion)
-            if verbose {
-                if seedSteps {
-                    write !, "Starting seeding steps for module = "_..Name_" & class = "_className
-                } else {
-                    write !, "Starting to run update steps for module = "_..Name_" & class = "_className
-                }
+            if seedSteps {
+                set line = "Starting seeding steps for module = "_..Name_" & class = "_className
+            } else {
+                set line = "Starting to run update steps for module = "_..Name_" & class = "_className
             }
+            $$$LogLine(line)
 
             // Don't want newStepToApply (execution of all subsequent steps when encountering a new one) to persist across versions
             set newStepToApply = 0
             if $system.CLS.IsMthd(className, "GetOrderedMethods") {
                 set orderedMethodNames = $classmethod(className, "GetOrderedMethods")
-                do ..HandleUpdateStepsFromList(orderedMethodNames, className, 0, logFile, seedSteps, .newStepToApply, verbose)
+                do ..HandleUpdateStepsFromList(orderedMethodNames, className, 0, logFile, seedSteps, .newStepToApply)
             }
             if $system.CLS.IsMthd(className, "GetOrderedMethodsPrimaryOnly") {
                 set primaryOnlyMethodNames = $classmethod(className, "GetOrderedMethodsPrimaryOnly")
-                do ..HandleUpdateStepsFromList(primaryOnlyMethodNames, className, 1, logFile, seedSteps, .newStepToApply, verbose)
+                do ..HandleUpdateStepsFromList(primaryOnlyMethodNames, className, 1, logFile, seedSteps, .newStepToApply)
             }
 
-            if verbose {
-                if seedSteps {
-                    write !, "Finished seeding steps for module = "_..Name_" & class = "_className
-                }
-                else {
-                    write !, "Finished running update steps for module = "_..Name_" & class = "_className
-                }
+            if seedSteps {
+                set line = "Finished seeding steps for module = "_..Name_" & class = "_className
+            } else {
+                set line = "Finished running update steps for module = "_..Name_" & class = "_className
             }
+            $$$LogLine(line)
         }
     } catch (ex) {
         set sc = ex.AsStatus()
     }
 
     if 'seedSteps {
-        if verbose {
-            write !, "Releasing lock on ^IPM.UpdateLock("_..Name_")"
-        }
+        $$$LogLine("Releasing lock on ^IPM.UpdateLock("_..Name_")")
         $$$UnlockUpdateModule(..Name)
     }
 
@@ -175,15 +167,14 @@ Method HandleUpdateStepsFromList(
 	primaryOnly As %Boolean,
 	logFile As %Library.File,
 	seedSteps As %Boolean = 0,
-	ByRef newStepToApply As %Boolean = 0,
-	verbose As %Boolean = 0) [ Internal, Private ]
+    ByRef newStepToApply As %Boolean = 0) [ Internal, Private ]
 {
     set iter = methodList.%GetIterator()
     while iter.%GetNext(, .methodName) {
         // Get update step object for this className + methodName. If one does not already exist, create a new one and use that
         set stepObj = ..GetAddUpdateStep(className, methodName, primaryOnly)
         if seedSteps {
-            do ..SeedUpdateStep(stepObj, verbose)
+            do ..SeedUpdateStep(stepObj)
         } else {
             // Once we come across a step that hasn't been run/seeded or failed on its last run, mark newStepToApply as true.
             // This indicates that we should run all subsequent steps, regardless of their current status
@@ -191,7 +182,7 @@ Method HandleUpdateStepsFromList(
                 set newStepToApply = 1
             }
             if newStepToApply {
-                do ..ExecuteUpdateStep(stepObj, primaryOnly, verbose)
+                do ..ExecuteUpdateStep(stepObj, primaryOnly)
             }
         }
     }
@@ -201,39 +192,29 @@ Method HandleUpdateStepsFromList(
 /// Seeding steps mark the steps as having been successfully run so will not be run on subsequent 'update' calls
 /// Only seed steps that have no TimeStampEnd defined (not already been run/seeded) or errored on their last run
 Method SeedUpdateStep(
-	updateStep As %IPM.Storage.UpdateStep.Base,
-	verbose As %Boolean = 0)
+    updateStep As %IPM.Storage.UpdateStep.Base)
 {
     if 'updateStep.TimeStampEnd || $$$ISERR(updateStep.Status) {
-        if verbose {
-            write !, $char(9)_"Seeding "_updateStep.MethodName_"()"
-        }
+        $$$LogLine($char(9)_"Seeding "_updateStep.MethodName_"()")
         set updateStep.TimeStampEnd = $zdatetime($horolog,3)
         set updateStep.Status = $$$OK
         $$$ThrowOnError(updateStep.%Save())
     }
     else {
-        if verbose {
-            write !, $char(9)_"Skipping seeding "_updateStep.MethodName_"() (already run or seeded)"
-        }
+        $$$LogLine($char(9)_"Skipping seeding "_updateStep.MethodName_"() (already run or seeded)")
     }
 }
 
 /// Executes an update step
 Method ExecuteUpdateStep(
 	updateStep As %IPM.Storage.UpdateStep.Base,
-	primaryOnly As %Boolean,
-	verbose As %Boolean = 0)
+    primaryOnly As %Boolean)
 {
     if primaryOnly && $system.Mirror.IsMember() && '$system.Mirror.IsPrimary() {
-        if verbose {
-            write !, $char(9)_"Skipping "_updateStep.MethodName_"(). This step is to be run on the mirror primary only."
-        }
+        $$$LogLine($char(9)_"Skipping "_updateStep.MethodName_"(). This step is to be run on the mirror primary only.")
         quit
     }
-    if verbose {
-        write !, $char(9)_"Running "_updateStep.MethodName_"()"
-    }
+    $$$LogLine($char(9)_"Running "_updateStep.MethodName_"()")
     set updateStep.TimeStampStart = $zdatetime($horolog,3)
     set sc = $$$OK
     try {
@@ -246,9 +227,7 @@ Method ExecuteUpdateStep(
     set sc = updateStep.%Save()
     $$$ThrowOnError(sc)
     $$$ThrowOnError(updateStep.Status)
-    if verbose {
-        write !, $char(9)_updateStep.MethodName_"() Finished"
-    }
+    $$$LogLine($char(9)_updateStep.MethodName_"() Finished")
 }
 
 /// Get or Add an update step for this current module based on className + methodName index
@@ -356,7 +335,7 @@ ClassMethod CheckSystemRequirements(pModuleName As %String) As %Status
 Method WriteAfterInstallMessage()
 {
     if ..AfterInstallMessage '= "" {
-        write !,..%Evaluate(..AfterInstallMessage),!
+        $$$LogLine(..%Evaluate(..AfterInstallMessage),,1)
     }
 }
 
@@ -511,9 +490,8 @@ ClassMethod ExecutePhases(
 
             // Note: this is used later if the module object is reloaded.
             set tOverrideClass = $classname(tModule.Lifecycle)
-            if tVerbose {
-                write !,"Using lifecycle class ",tOverrideClass,"; override class is "_tModule.OverrideLifecycleClass
-            }
+            set line = "Using lifecycle class "_tOverrideClass_"; override class is "_tModule.OverrideLifecycleClass
+            $$$LogLine(line)
         }
 
         set tLifecycle = tModule.Lifecycle
@@ -563,7 +541,8 @@ ClassMethod ExecutePhases(
                 }
                 set tLifecycle = tModule.Lifecycle
                 set tLifecycle.PhaseList = tPhases
-                write !,"["_tModule.DisplayName_"]",$char(9),"Module object refreshed."
+                set line = "["_tModule.DisplayName_"]"_$char(9)_"Module object refreshed."
+                $$$LogLine(line,,1)
                 continue
             }
             // history logging for phases
@@ -573,11 +552,12 @@ ClassMethod ExecutePhases(
 
             set tSC = $$$OK
             try {
-                write !,"["_$namespace_"|"_tModule.DisplayName_"]",$char(9),tOnePhase," START"
+                set line = "["_$namespace_"|"_tModule.DisplayName_"]"_$char(9)_tOnePhase_" START"
                 // for the reload phase, print root from which module is being loaded
                 if tOnePhase = "Reload" {
-                    write " ("_tModule.Root_")"
+                    set line = line_" ("_tModule.Root_")"
                 }
+                $$$LogLine(line,,1)
 
                 // Notify source control (no-op if not configured)
                 set tSC = ##class(%IPM.ExtensionBase.SourceControl.Interface).%OnBeforePhase(tModule,tOnePhase,.pParams)
@@ -647,10 +627,11 @@ ClassMethod ExecutePhases(
                     // Self-uninstall: After Clean deletes IPM's own classes, skip all post-phase callbacks
                     if isSelfUninstall {
                         // Print success message before skipping
-                        write !,"["_$namespace_"|"_tModule.DisplayName_"]",$char(9),tOnePhase," SUCCESS"
+                        set line = "["_$namespace_"|"_tModule.DisplayName_"]"_$char(9)_tOnePhase_" SUCCESS"
                         if tTiming {
-                            write " ("_($zhorolog-tStart)_" s)"
+                            set line = line_" ("_($zhorolog-tStart)_" s)"
                         }
+                        $$$LogLine(line,,1)
                         // Skip all post-phase processing - classes have been deleted
                         continue
                     }
@@ -697,13 +678,17 @@ ClassMethod ExecutePhases(
             }
 
             if $$$ISERR(tSC) {
-                write !,"["_tModule.DisplayName_"]",$char(9),tOnePhase," FAILURE"
+                set line = "["_tModule.DisplayName_"]"_$char(9)_tOnePhase_" FAILURE"_$select(tTiming:" ("_($zhorolog-tStart)_" s)",1:"")
+                set level = $$$Error
             } else {
-                write !,"["_$namespace_"|"_tModule.DisplayName_"]",$char(9),tOnePhase," SUCCESS"
+                set line = "["_$namespace_"|"_tModule.DisplayName_"]"_$char(9)_tOnePhase_" SUCCESS"
+                set level = $$$Info
             }
             if tTiming {
-                write " ("_($zhorolog-tStart)_" s)"
+                set line = line_" ("_($zhorolog-tStart)_" s)"
+                set level = $$$Info
             }
+            $$$LogLine(line,level,1)
             $$$ThrowOnError(tSC)
 
             if pLog '= "" {
@@ -711,7 +696,8 @@ ClassMethod ExecutePhases(
             }
         }
         if tOverallTiming {
-            write !,"["_tModule.DisplayName_"]",$char(9),"(total time: ",($zhorolog-tFullStart)," s)"
+            set line = "["_tModule.DisplayName_"]"_$char(9)_"(total time: "_($zhorolog-tFullStart)_" s)"
+            $$$LogLine(line,,1)
         }
     } catch e {
         set tSC = e.AsStatus()

@@ -1,3 +1,5 @@
+Include %IPM.Common
+
 Class %IPM.Lifecycle.Module Extends %IPM.Lifecycle.Base
 {
 
@@ -26,11 +28,9 @@ Method %Clean(ByRef pParams) As %Status
 
         // Special handling for IPM self-uninstall: clean up operational globals
         if (..Module.Name = $$$IPMModuleName) {
-            set verbose = $get(pParams("Verbose"))
-
             // Check if user wants full cleanup (delete ALL module records and operational globals)
             if $get(pParams("Clean","FullCleanup"), 0) {
-                write:verbose !,"Performing cleanup of IPM globals..."
+                $$$LogLine("Performing cleanup of IPM globals...")
 
                 kill ^IPM.Storage.ModuleD          // Delete ALL module records (including orphans)
                 kill ^IPM.Storage.ModuleI
@@ -54,7 +54,7 @@ Method %Clean(ByRef pParams) As %Status
                 // Note: Preserve ^IPM.General.HistoryD for audit trail
                 // Note: Preserve ^IPM.settings in %SYS for user preferences
 
-                write:verbose !,"Cleanup complete."
+                $$$LogLine("Cleanup complete.")
             } else {
                 // Check if modules were orphaned
                 // IPM is always at index 1, so start checking at index 2
@@ -68,7 +68,7 @@ Method %Clean(ByRef pParams) As %Status
 
                 if $listlength(orphanedModules) > 0 {
                     // Modules were orphaned - warn user but still clean up
-                    write !,"WARNING: ",$listlength(orphanedModules)," module(s) orphaned:"
+                    $$$LogLine($listlength(orphanedModules)_" module(s) orphaned:", $$$Warning, 1)
 
                     // List orphaned modules with versions
                     set ptr = 0
@@ -77,12 +77,12 @@ Method %Clean(ByRef pParams) As %Status
                             set modData = ^IPM.Storage.ModuleD(index)
                             set modName = $listget(modData, 2)
                             set version = $listget(modData, 4)
-                            write !,"  - ",modName," (",version,")"
+                            $$$LogLine("  - "_modName_" ("_version_")",,1)
                         } catch {
-                            write !,"  - (unknown module at index ",index,")"
+                            $$$LogLine("  - (unknown module at index "_index_")",,1)
                         }
                     }
-                    write !,"Reinstalling IPM will automatically re-adopt these modules."
+                    $$$LogLine("Reinstalling IPM will automatically re-adopt these modules.",,1)
                 }
             }
         }
@@ -102,7 +102,6 @@ Method %Activate(ByRef pParams) As %Status
         set tSC = ..Configure(.pParams)
         $$$ThrowOnError(tSC)
 
-        set verbose = $get(pParams("Verbose"))
         // Create Studio project for package if it is loaded in developer mode and no explicit statement to not create it
         set tNoStudioProject = $get(pParams("NoStudioProject"), 0)
         if ..Module.DeveloperMode && 'tNoStudioProject {
@@ -110,20 +109,16 @@ Method %Activate(ByRef pParams) As %Status
             // Do not throw exceptions if failure to create because creating a Studio project should not block activation.
             // Just write the exception if in verbose mode
             set tStudioProjectSC = ..Module.GetStudioProject(.tProject)
-            if verbose {
-                if $$$ISOK(tStudioProjectSC) {
-                    write !, "Studio project created/updated: " _ tProject.Name _ ".PRJ"
-                } else {
-                    write !, "Unable to create/update Studio project: " _ tProject.Name _ ".PRJ"
-                    write !, $system.Status.GetErrorText(tStudioProjectSC)
-                }
+            if $$$ISOK(tStudioProjectSC) {
+                $$$LogLine("Studio project created/updated: " _ tProject.Name _ ".PRJ")
+            } else {
+                $$$LogLine("Unable to create/update Studio project: " _ tProject.Name _ ".PRJ", $$$Error)
+                $$$LogLine($system.Status.GetErrorText(tStudioProjectSC), $$$Error)
             }
         }
         if '$get(pParams("Update")) && '..Module.DeveloperMode {
-            if verbose {
-                write !, "Seeding update steps for module = ",..Module.Name, ", for version = ", ..Module.VersionString, !
-            }
-            $$$ThrowOnError(..Module.HandleAllUpdateSteps(, 1, verbose))
+            $$$LogLine("Seeding update steps for module = "_..Module.Name_", for version = "_..Module.VersionString)
+            $$$ThrowOnError(..Module.HandleAllUpdateSteps(, 1))
         }
     } catch e {
         set tSC = e.AsStatus()

@@ -1,4 +1,4 @@
-Class %IPM.General.LogManager.Message Extends %RegisteredObject
+Class %IPM.General.LogManager.Message Extends %RegisteredObject [Deprecated]
 {
 
 /// Severity display name -> logical value also available via macros in %IPM.Common.inc: <br />

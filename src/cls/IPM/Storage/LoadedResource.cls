@@ -134,10 +134,11 @@ ClassMethod Clear(pNamespace As %String = {$namespace}) As %Status
 /// @Modifier Availability InterSystems
 ClassMethod ReportConflicts()
 {
+    #include %IPM.Common
     try {
         $$$ThrowOnError(..Validate(,.tErrorList))
         for tIndex=1:1:$get(tErrorList) {
-            write !,"WARNING: ",tErrorList(tIndex)
+            $$$LogLine(tErrorList(tIndex), $$$Warning, 1)
         }
     } catch e {
         set tSC = e.AsStatus()
