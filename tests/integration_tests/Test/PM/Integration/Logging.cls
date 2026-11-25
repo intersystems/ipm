@@ -272,7 +272,7 @@ Method VerifyJsonlFileContents(
 {
     // Verify top-level info
     set expectedIPMVersion = ##class(%IPM.Storage.Module).NameOpen("zpm").VersionString
-    set expectedSchemaVersion = "https://raw.githubusercontent.com/intersystems/ipm/main/schemas/ipm-log/1.0.0"
+    set expectedSchemaVersion = "https://raw.githubusercontent.com/intersystems/ipm/refs/heads/main/schemas/ipm-log/1.0.0/ipm-log.schema.json"
     set expectedCommand = command
 
     set stream = ##class(%Stream.FileCharacter).%New()

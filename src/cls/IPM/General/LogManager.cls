@@ -105,7 +105,7 @@ Method InitializeLog(
         // Write the JSON Lines header as the first record; subsequent lines are log entries.
         set header = ##class(%DynamicObject).%New()
         // TODO: Replace hardcoded schema path with global IPM log schema setting
-        do header.%Set("$schema", "https://raw.githubusercontent.com/intersystems/ipm/refs/heads/logging-framework/schemas/ipm-log/" _ ..SchemaVersion_"/ipm-log.schema.json")
+        do header.%Set("$schema", "https://raw.githubusercontent.com/intersystems/ipm/refs/heads/main/schemas/ipm-log/" _ ..SchemaVersion_"/ipm-log.schema.json")
         set header.ipm = ipmVersion
         set header.command = ..Command
 
