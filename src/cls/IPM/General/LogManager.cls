@@ -138,7 +138,8 @@ Method WriteLogLine(
     set sc = $$$OK
     try {
         if (..Verbose || writeToTerminal) {
-            write !, message
+            set color = $select($$$Error: $$$Red, $$$Warning: $$$Yellow, $$$Info: $$$Default, $$$Trace: $$$Magenta)
+            write !, $$$FormattedLine(color, message)
         }
         if '..Initialized {
             return $$$OK
@@ -147,6 +148,13 @@ Method WriteLogLine(
         if '$listfind($listfromstring(..#LogLevels), level) {
             set errMsg = "Attempted to write to IPM command logs ("_..JSONFilePath_" and "_ ..TxtFilePath_") with invalid log level '"_level_"'. Please ensure log level is one of: "_..#LogLevels_$$$NL_"Attempted message to log was: "_message
             $$$ThrowOnError($$$ERROR($$$GeneralError, errMsg))
+            $$$ThrowOnError($$$ERROR(##class(%IPM.General.LogLevel).IsValid(level), "Attempted message to log: "_message))
+        }
+
+        try {
+            do ##class(%IPM.General.LogLevel).IsValid(level)
+        } catch ex {
+            $$$ThrowOnError($$$ERROR($$$GeneralError, "Invalid log level '"_level_"' for log message '"_message_"'."))
         }
 
         set timestamp = $zdatetime($ztimestamp, 3) _ " UTC"
