@@ -177,18 +177,6 @@ Method OnPhase(
                                 set tSC = $$$OK
                                 quit
                             }
-                            if ..ResourceReference.Deploy {
-                                $$$LogLine("Loading deployed resource from Studio project: "_..ResourceReference.Name)
-                                set ..CompileFromProject = 1
-                                if '$data($$$DeployedProjectInstalled(tDeployedProjectPath)) {
-                                    set sc = ##class(%Studio.Project).InstallFromFile(tDeployedProjectPath, "<none>")
-                                    if $$$ISERR(sc) {
-                                        $$$ThrowStatus($$$ERROR($$$GeneralError, "Resource path '" _ tDeployedProjectPath _ "' not found"))
-                                    }
-                                    set $$$DeployedProjectInstalled(tDeployedProjectPath) = ""
-                                }
-                                return $$$OK
-                            }
                             set tSC = $$$ERROR($$$GeneralError, "Resource path '" _ tResourcePath _ "' not found")
                         }
                         if $$$ISERR(tSC) continue

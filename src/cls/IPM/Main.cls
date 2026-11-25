@@ -2637,13 +2637,6 @@ ClassMethod Install(
                     set tParams("cmd") = "install"
                     set tParams("Install") = 1
                 }
-                if tResult.Deployed {
-                    set platformVersion = $system.Version.GetMajor() _ "." _$system.Version.GetMinor()
-                    set tResult.PlatformVersion = platformVersion
-                    if ('tResult.PlatformVersions.Find(platformVersion)) {
-                        $$$ThrowStatus($$$ERROR($$$GeneralError, "Deployed package '" _ tModuleName _ "' " _ tResult.VersionString _ " not supported on this platform " _ platformVersion _ "."))
-                    }
-                }
                 $$$ThrowOnError(log.SetSource(tResult.ServerName))
                 $$$ThrowOnError(log.SetVersion(tResult.Version))
                 $$$ThrowOnError(##class(%IPM.Utils.Module).LoadQualifiedReference(tResult, .tParams, , log))

@@ -57,9 +57,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ArtifactoryTarball` resources download without credentials from Artifactory servers that allow anonymous read access, using the artifact and property search APIs instead of AQL. Only `ARTI_SERVER` is required: `ARTI_PORT` defaults to 443 and `ARTI_AQL_URL` to `/artifactory/api/search/aql`.
 - Minimum supported Python version is now 3.9 (was previously 3.10)
 
-### Changed
-- Minimum supported Python version is now 3.9
-
 ### Fixed
 - #1260: ensure appropriate error reported if -env file does not exist.
 - Performance: Studio project creation on package load in dev mode is now 80% faster.
