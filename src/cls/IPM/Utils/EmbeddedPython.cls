@@ -1,12 +1,12 @@
 /// Helper methods in Python for efficient manipulation of %SYS.Python objects
-Class %IPM.Utils.EmbeddedPython [ Language = python ]
+Class %IPM.Utils.EmbeddedPython 
 {
 
 /// This method returns a total order, instead of a partial order.
 /// In other words, v1.2.3-alpha and v4.5.6-beta should be comparable.
 ClassMethod CompareVersionTotalOrder(
 	ver1 As %String,
-	ver2 As %String) As %Integer
+	ver2 As %String) As %Integer [ Language = python ]
 {
     import iris
 
@@ -42,7 +42,7 @@ ClassMethod CompareVersionTotalOrder(
 /// If <parameter>reverse</parameter> is a truthy value, sort in descending order
 ClassMethod SortVersions(
 	versions As %SYS.Python,
-	reverse As %SYS.Python = 0) As %SYS.Python
+	reverse As %SYS.Python = 0) As %SYS.Python [ Language = python ]
 {
     import iris
     from functools import cmp_to_key
@@ -58,7 +58,7 @@ ClassMethod SortVersions(
 /// If <parameter>reverse</parameter> is a truthy value, sort in descending order
 ClassMethod SortOCITags(
 	tags As %SYS.Python,
-	reverse As %SYS.Python = 0) As %SYS.Python
+	reverse As %SYS.Python = 0) As %SYS.Python [ Language = python ]
 {
     import iris
     from functools import cmp_to_key
